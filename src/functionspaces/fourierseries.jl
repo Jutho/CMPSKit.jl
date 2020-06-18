@@ -239,7 +239,8 @@ function LinearAlgebra.axpy!(α::Number, Fx::FourierSeries, Fy::FourierSeries)
             LinearAlgebra.axpy!(α, coefficients(Fx), coefficients(Fy))
         end
     else
-        for k in eachindex(Fx)
+        K = nummodes(Fx)
+        Threads.@threads for k in -K:K
             axpy!(α, Fx[k], Fy[k])
         end
     end
@@ -258,7 +259,8 @@ function LinearAlgebra.axpby!(α::Number, Fx::FourierSeries, β::Number, Fy::Fou
             LinearAlgebra.axpby!(α, coefficients(Fx), β, coefficients(Fy))
         end
     else
-        for k in eachindex(Fy)
+        K = nummodes(Fy)
+        Threads.@threads for k in -K:K
             if abs(k) <= Kx
                 axpby!(α, Fx[k], β, Fy[k])
             else
@@ -280,22 +282,25 @@ function truncmul!(F::FourierSeries, F1::FourierSeries, F2::FourierSeries,
     K2 = nummodes(F2)
     K = min(Kmax, K1+K2)
     setnummodes!(F, K)
-    for k = -K:K
+    Threads.@threads for k = -K:K
         fk = F[k]
         if fk isa AbstractArray
-            if β != 1
-                rmul!(fk, β)
+            T = eltype(fk)
+            if β == 0
+                fill!(fk, T(β))
+            elseif β != 1
+                rmul!(fk, T(β))
             end
             for k1 = max(-K1, k-K2):min(K1, k+K2)
                 k2 = k - k1
                 fk1 = F1[k1]
                 fk2 = F2[k2]
                 if fk1 isa AbstractArray && fk2 isa AbstractArray
-                    mul!(fk, fk1, fk2, α, true)
+                    mul!(fk, fk1, fk2, T(α), T(true))
                 elseif fk1 isa AbstractArray
-                    axpy!(fk2*α, fk1, fk)
+                    axpy!(T(fk2*α), fk1, fk)
                 elseif fk2 isa AbstractArray
-                    axpy!(fk1*α, fk2, fk)
+                    axpy!(T(fk1*α), fk2, fk)
                 else
                     @warn "unexpected branch"
                     fk .= fk + (fk1*fk2*α)

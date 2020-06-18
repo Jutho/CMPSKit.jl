@@ -6,3 +6,4 @@ Random.seed!(1111)
 
 include("fourierseries.jl")
 include("uniformcmps.jl")
+include("periodiccmps.jl")
