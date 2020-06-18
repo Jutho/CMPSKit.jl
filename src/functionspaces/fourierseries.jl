@@ -17,6 +17,15 @@ domain(f::FourierSeries) = (zero(period(f)), period(f))
 nummodes(F::FourierSeries) = (length(F.coeffs)-1) >> 1
 coefficients(F::FourierSeries) = F.coeffs
 
+function Base.:(==)(F1::FourierSeries, F2::FourierSeries)
+    F1.period == F2.period || return false
+    K = max(nummodes(F1), nummodes(F2))
+    for k = -K:K
+        F1[k] == F2[k] || return false
+    end
+    return true
+end
+
 # Indexing, getting and setting coefficients
 Base.eachindex(F::FourierSeries) = UnitRange(-nummodes(F), nummodes(F))
 function Base.getindex(F::FourierSeries, k)

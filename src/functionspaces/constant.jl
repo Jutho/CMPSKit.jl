@@ -12,6 +12,8 @@ coefficients(F::Constant) = F.coeffs
 
 truncate!(F::Constant; kwargs...) = F
 
+Base.:(==)(F1::Constant, F2::Constant) = (F1[] == F2[])
+
 # Indexing, getting and setting coefficients
 Base.eachindex(F::Constant) = 0:0
 Base.getindex(F::Constant) = F.coeffs[]
@@ -140,6 +142,12 @@ localdot(F1::Constant, F2::Constant) = Constant(dot(F1[], F2[]))
 
 LinearAlgebra.dot(F1::Constant, F2::Constant) = dot(F1[], F2[])
 LinearAlgebra.norm(F::Constant) = norm(F[])
+
+function LinearAlgebra.isapprox(x::Constant, y::Constant;
+                                atol::Real=0,
+                                rtol::Real=defaulttol(x[0]))
+    return norm(x-y) <= max(atol, rtol*max(norm(x), norm(y)))
+end
 
 differentiate(F::Constant) = zero(F)
 integrate(F::Constant, (a,b)::Tuple{Real,Real}) = F[]*(b-a)

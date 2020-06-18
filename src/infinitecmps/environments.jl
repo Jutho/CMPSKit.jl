@@ -70,7 +70,8 @@ function environments!(Ψ::InfiniteCMPS, ρL₀ = one(Ψ.Q), ρR₀ = one(Ψ.Q);
         @warn "Different left and right normalization: $λL versus $λR"
 
     Q0 = Ψ.Q[0]
-    view(Q0, diagind(Q0)) .-= (λL+λR)/2
+    Q0d = view(Q0, diagind(Q0))
+    Q0d .-= (λL+λR)/2
 
     Z = dot(ρL, ρR)
     imag(Z) < defaulttol(Z) && real(Z) > 0 ||

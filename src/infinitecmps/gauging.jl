@@ -16,8 +16,9 @@ function leftgauge!(Ψ::UniformCMPS, C₀ = one(Ψ.Q);
     D, V = eigen!(Hermitian(ρL[]))
     Dsqrt = sqrt.(max.(D, defaulttol(D)))
     _, C = qr!(Diagonal(Dsqrt)*V')
+    C ./= norm(C)
     CL = UpperTriangular(C)
-
+    
     Ψ.Q = Constant(rdiv!(CL*Ψ.Q[], CL))
     Qdiag = view(Ψ.Q[], diagind(Ψ.Q[]))
     Qdiag .-= λ
