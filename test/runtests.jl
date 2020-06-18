@@ -1,6 +1,6 @@
 using CMPSKit
 using Test
+using LinearAlgebra
 
-@testset "CMPSKit.jl" begin
-    # Write your tests here.
-end
+
+include("fourierseries.jl")
