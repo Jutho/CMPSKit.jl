@@ -15,26 +15,17 @@ mutable struct InfiniteCMPS{T<:PeriodicMatrixFunction,N} <: AbstractCMPS{T,N}
     Rs::NTuple{N,T}
     gauge::Symbol
     function InfiniteCMPS(Q::T, Rs::NTuple{N,T}; gauge::Symbol = :n) where {T,N}
-        if T <: AbstractMatrix
-            size(Q, 1) == size(Q, 2) || throw(DimensionMismatch())
-            for R in Rs
-                size(R) == size(Q) || throw(DimensionMismatch())
-            end
-        else
-            for R in Rs
-                domain(R) == domain(Q) || throw(DomainMismatch())
-            end
-            Q0 = Q[0]
-            size(Q0, 1) == size(Q0, 2) || throw(DimensionMismatch())
-            for R in Rs
-                size(R[0]) == size(Q0) || throw(DimensionMismatch())
-            end
+        for R in Rs
+            domain(R) == domain(Q) || throw(DomainMismatch())
+        end
+        Q0 = Q[0]
+        size(Q0, 1) == size(Q0, 2) || throw(DimensionMismatch())
+        for R in Rs
+            size(R[0]) == size(Q0) || throw(DimensionMismatch())
         end
         return new{T,N}(Q, Rs, gauge)
     end
 end
-InfiniteCMPS(Q::T, Rs::NTuple{N,T}; kwargs...) where {T<:AbstractMatrix,N} =
-    InfiniteCMPS(Constant(Q), Constant.(Rs); kwargs...)
 InfiniteCMPS(Q::T, R::T; kwargs...) where T = InfiniteCMPS(Q, (R,); kwargs...)
 
 domain(::InfiniteCMPS) = (-Inf, +Inf)

@@ -7,11 +7,11 @@ Dlist = (2,4,12,29,71)
         R1 = Constant(randn(T, (D,D)))
         R2 = Constant(randn(T, (D,D)))
         Ψ = InfiniteCMPS(Q, (R1,R2))
-        ρL, λL, infoL = leftenv(Ψ; krylovdim = min(D^2,50), tol = 1e-12)
+        ρL, λL, infoL = leftenv(Ψ; krylovdim = 50, tol = 1e-12)
         @test norm(Q'*ρL + ρL*Q + R1'*ρL*R1 + R2'*ρL*R2 - 2*λL*ρL) <= 10*infoL.normres[1]
         @test ρL == ρL'
 
-        ρR, λR, infoR = rightenv(Ψ; krylovdim = min(D^2,50), tol = 1e-12)
+        ρR, λR, infoR = rightenv(Ψ; krylovdim = 50, tol = 1e-12)
         @test norm(Q*ρR + ρR*Q' + R1*ρR*R1' + R2*ρR*R2' - 2*λR*ρR) <= 10*infoR.normres[1]
         @test λL ≈ λR
         @test ρR == ρR'
@@ -20,7 +20,21 @@ Dlist = (2,4,12,29,71)
         @test imag(Z) <= sqrt(infoL.normres[1]*infoR.normres[1])
 
         Ψn = copy(Ψ)
-        ρL2, ρR2, = environments!(Ψn; krylovdim = min(D^2,50), tol = 1e-12)
+        ρL2, = leftenv!(Ψn; krylovdim = 50, tol = 1e-12)
+        @test ρL2 ≈ ρL
+        Qn = Ψn.Q
+        R1n, R2n = Ψn.Rs
+        @test norm(Qn'*ρL + ρL*Qn + R1n'*ρL*R1n + R2n'*ρL*R2n) <= 1e-9
+
+        Ψn = copy(Ψ)
+        ρR2, = rightenv!(Ψn; krylovdim = 50, tol = 1e-12)
+        @test ρR2 ≈ ρR
+        Qn = Ψn.Q
+        R1n, R2n = Ψn.Rs
+        @test norm(Qn*ρR + ρR*Qn' + R1n*ρR*R1n' + R2n*ρR*R2n') <= 1e-9
+
+        Ψn = copy(Ψ)
+        ρL2, ρR2 = environments!(Ψn; krylovdim = 50, tol = 1e-12)
         @test ρL2 ≈ ρL/sqrt(Z)
         @test ρR2 ≈ ρR/sqrt(Z)
         Qn = Ψn.Q
