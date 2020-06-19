@@ -39,6 +39,7 @@ struct Pairing{i,j} <: FieldOperator end
 Base.:*(::Annihilation{i}, ::Annihilation{j}) where {i,j} = Pairing{i,j}()
 
 Base.:literal_pow(::typeof(^), ::Annihilation{i}, ::Val{2}) where {i} = Pairing{i,i}()
+Base.:literal_pow(::typeof(^), ::Creation{i}, ::Val{2}) where {i} = Pairing{i,i}()'
 
 #####################
 # NormalOrderedTerm #

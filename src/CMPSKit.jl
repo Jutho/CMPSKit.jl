@@ -5,7 +5,7 @@ export expval, average_energy, energy_density
 export leftenv, rightenv, leftenv!, rightenv!, environments!
 export leftgauge, rightgauge, leftgauge!, rightgauge!,
         leftcanonical, rightcanonical, leftcanonical!, rightcanonical!
-export InfiniteCMPS, TransferLeft, TransferRight
+export InfiniteCMPS, LeftTransfer, RightTransfer
 export Constant, FourierSeries
 export fit, differentiate, integrate, ∂, ∫, localdot, domain, period, nummodes
 export leftreducedoperator, rightreducedoperator, expval

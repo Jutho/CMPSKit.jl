@@ -50,12 +50,12 @@ function rightreducedoperator(ops::LocalOperator, Ψ::AbstractCMPS, ρR = nothin
     hR = zero(ρR)
     for (coeff, op) in zip(coefficients(ops), operators(ops))
         if coeff isa Number
-            axpy!(coeff, rightreducedoperator(op, Ψ, ρR), hL)
+            axpy!(coeff, rightreducedoperator(op, Ψ, ρR), hR)
         else
-            hL += coeff * rightreducedoperator(op, Ψ, ρR)
+            hR += coeff * rightreducedoperator(op, Ψ, ρR)
         end
     end
-    return hL
+    return hR
 end
 
 function expval(ops::LocalOperator, Ψ::AbstractCMPS, ρL = nothing, ρR = nothing; kwargs...)

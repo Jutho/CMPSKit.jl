@@ -138,11 +138,11 @@ function rightenv(H::LocalHamiltonian, Ψρs::InfiniteCMPSData, HR₀ = zero(Ψ�
     (Ψ,ρL,ρR) = Ψρs
     domain(H) == domain(Ψ) || throw(DomainMismatch())
 
-    hR = rightreducedoperator(H.h, Ψ, ρL)
+    hR = rightreducedoperator(H.h, Ψ, ρR)
     eR = real(localdot(ρL, hR))
     hR = axpy!(-dot(ρL, hR), ρR, hR)
 
-    HL₀ = HL₀ - ρR * dot(ρL, HR₀)
+    HR₀ = HR₀ - ρR * dot(ρL, HR₀)
     alg = GMRES(;tol = tol, krylovdim = krylovdim, maxiter = maxiter)
     let TR = RightTransfer(Ψ)
         HR, infoR = linsolve(hR, HR₀, alg) do x
@@ -152,8 +152,24 @@ function rightenv(H::LocalHamiltonian, Ψρs::InfiniteCMPSData, HR₀ = zero(Ψ�
         end
         HR = rmul!(HR + HR', 0.5)
         HR = truncate!(HR; tol = tol/10, kwargs...)
-        res = hR - (∂(HR)-TL(HR))
+        res = hR - (-∂(HR)-TR(HR))
         infoR = ConvergenceInfo(infoR.converged, res, norm(res), infoR.numiter, infoR.numops)
         return HR, eR, hR, infoR
     end
+end
+
+function environments!(H::LocalHamiltonian, Ψ::InfiniteCMPS; kwargs...)
+    ρL, ρR, infoρL, infoρR = environments!(Ψ; kwargs...)
+    HL, HR, hL, hR, e, infoHL, infoHR = environments(H,(Ψ,ρL,ρR); kwargs...)
+    return HL, HR, ρL, ρR, hL, hR, e, infoHL, infoHR, infoρL, infoρR
+end
+
+function environments(H::LocalHamiltonian, Ψρs::InfiniteCMPSData,
+                        HL₀ = zero(Ψρs[1].Q), HR₀ = zero(Ψρs[1].Q); kwargs...)
+    HL, eL, hL, infoHL = leftenv(H, Ψρs, HL₀; kwargs...)
+    HR, eR, hR, infoHR = rightenv(H, Ψρs, HR₀; kwargs...)
+    eL ≈ eR ||
+        @warn "non-matching energy from left and right environments"
+    e = rmul!(eL + eR, 0.5)
+    return HL, HR, hL, hR, e, infoHL, infoHR
 end

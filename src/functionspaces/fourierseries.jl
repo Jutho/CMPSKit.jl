@@ -89,10 +89,15 @@ Base.copy(F::FourierSeries) = FourierSeries(copy.(coefficients(F)), period(F))
 
 Base.:-(F::FourierSeries) = FourierSeries(.-coefficients(F), period(F))
 
-Base.:*(F::FourierSeries, a) = FourierSeries([f*a for f in coefficients(F)], period(F))
-Base.:*(a, F::FourierSeries) = FourierSeries([a*f for f in coefficients(F)], period(F))
-Base.:/(F::FourierSeries, a) = FourierSeries([f/a for f in coefficients(F)], period(F))
-Base.:\(a, F::FourierSeries) = FourierSeries([a\f for f in coefficients(F)], period(F))
+const Const = Union{Number,AbstractArray}
+Base.:*(F::FourierSeries, a::Const) =
+    FourierSeries([f*a for f in coefficients(F)], period(F))
+Base.:*(a::Const, F::FourierSeries) =
+    FourierSeries([a*f for f in coefficients(F)], period(F))
+Base.:/(F::FourierSeries, a::Const) =
+    FourierSeries([f/a for f in coefficients(F)], period(F))
+Base.:\(a::Const, F::FourierSeries) =
+    FourierSeries([a\f for f in coefficients(F)], period(F))
 
 function Base.:+(F1::FourierSeries, F2::FourierSeries)
     domain(F1) == domain(F2) || throw(DomainMismatch())
@@ -382,7 +387,7 @@ function fit(f, ::Type{FourierSeries}, period = 1; Kmax = 10, tol = 1e-12)
     fx = map(f, x)
     ω = 2*pi*0/period
     integrand = exp.((-im*ω) .* x) .* fx
-    F = FourierSeries([sum(fx)/(2K+1)], period)
+    F = FourierSeries([sum(integrand)/(2K+1)], period)
     isrealf = all(isreal, fx)
     for k = 1:Kmax
         ω = 2*pi*k/period
