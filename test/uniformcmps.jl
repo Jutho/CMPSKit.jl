@@ -83,8 +83,8 @@ end
             HR, eR, hR = rightenv(H, (Ψ,ρL,ρR); krylovdim = 100, tol = 1e-12)
 
             @test eL ≈ eR
-            @test norm(LeftTransfer(Ψ)(HL) + hL) <= 1e-9
-            @test norm(RightTransfer(Ψ)(HR) + hR) <= 1e-9
+            @test norm(LeftTransfer(Ψ)(HL) + hL) <= 1e-9*norm(HL)
+            @test norm(RightTransfer(Ψ)(HR) + hR) <= 1e-9*norm(HR)
             @test abs(dot(HL,ρR)) <= 1e-9
             @test abs(dot(ρL,HR)) <= 1e-9
         end
