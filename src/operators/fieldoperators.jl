@@ -88,3 +88,88 @@ function _ketbrafactors(op::NormalOrderedTerm{A,A}, Q, Rs) where A
     x = _ketfactor(op, Q, Rs)
     return (x, x)
 end
+
+localgradientQ(op::FieldOperator, Q, Rs, ρL, ρR) = zero(Q)
+localgradientQ(op::DifferentiatedCreation{i}, Q, Rs, ρL, ρR) where {i} =
+    -Rs[i]'*(ρL*ρR) + (ρL*ρR)*Rs[i]'
+function localgradientQ(op::NormalOrderedTerm{DifferentiatedAnnihilation{i}, <:Any},
+                            Q, Rs, ρL, ρR) where {i}
+    y = ρL*_ketfactor(op, Q, Rs)*ρR
+    return y * Rs[i]' - Rs[i]' * y
+end
+
+localgradientRs(op::OnlyAnnihilators, Q, Rs, ρL, ρR) = zero.(Rs)
+function localgradientRs(op::Creation{i}, Q, Rs, ρL, ρR) where i
+    R̄s = ntuple(length(Rs)) do n
+        R̄ = zero(ρL)
+        if n == i
+            R̄ += ρL*ρR
+        end
+        R̄
+    end
+    return R̄s
+end
+function localgradientRs(op::DifferentiatedCreation{i}, Q, Rs, ρL, ρR) where {i}
+    R̄s = ntuple(length(Rs)) do n
+        R̄ = zero(ρL)
+        if n == i
+            f = ρL*ρR
+            R̄ += Q'*f - f*Q' - ∂(f)
+        end
+        R̄
+    end
+    return R̄s
+end
+function localgradientRs(op::AdjointOperator{Pairing{i,j}}, Q, Rs, ρL, ρR) where {i,j}
+    R̄s = ntuple(length(Rs)) do n
+        R̄ = zero(ρL)
+        if n == i
+            R̄ += ρL*ρR*Rs[j]'
+        end
+        if n == j
+            R̄ += Rs[i]'*ρL*ρR
+        end
+        R̄
+    end
+    return R̄s
+end
+
+function localgradientRs(op::NormalOrderedTerm{Annihilation{i}, <:Any},
+                            Q, Rs, ρL, ρR) where {i}
+    f = ρL*_ketfactor(op, Q, Rs)*ρR
+    R̄s = ntuple(length(Rs)) do n
+        R̄ = zero(f)
+        if n == i
+            R̄ += f
+        end
+        R̄
+    end
+    return R̄s
+end
+function localgradientRs(op::NormalOrderedTerm{<:DifferentiatedAnnihilation{i}, <:Any},
+                            Q, Rs, ρL, ρR) where {i}
+    f = ρL*_ketfactor(op, Q, Rs)*ρR
+    R̄s = ntuple(length(Rs)) do n
+        R̄ = zero(ρL)
+        if n == i
+            R̄ += Q'*f - f*Q' - ∂(f)
+        end
+        return R̄
+    end
+    return R̄s
+end
+function localgradientRs(op::NormalOrderedTerm{Pairing{i,j}, <:Any},
+                            Q, Rs, ρL, ρR) where {i,j}
+    f = ρL*_ketfactor(op, Q, Rs)*ρR
+    R̄s = ntuple(length(Rs)) do n
+        R̄ = zero(ρL)
+        if n == i
+            R̄ += f*Rs[j]'
+        end
+        if n == j
+            R̄ += Rs[i]'*f
+        end
+        return R̄
+    end
+    return R̄s
+end

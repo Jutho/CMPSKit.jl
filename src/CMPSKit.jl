@@ -8,7 +8,7 @@ export leftgauge, rightgauge, leftgauge!, rightgauge!,
 export InfiniteCMPS, LeftTransfer, RightTransfer
 export Constant, FourierSeries
 export fit, differentiate, integrate, ∂, ∫, localdot, domain, period, nummodes
-export leftreducedoperator, rightreducedoperator, expval
+export leftreducedoperator, rightreducedoperator, expval, gradient, groundstate
 
 export ψ, ∂ψ
 
@@ -44,6 +44,8 @@ include("infinitecmps/infinitecmps.jl")
 include("infinitecmps/transfer.jl")
 include("infinitecmps/environments.jl")
 include("infinitecmps/gauging.jl")
+include("infinitecmps/gradients.jl")
+include("infinitecmps/groundstate.jl")
 
 
 end

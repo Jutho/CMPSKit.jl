@@ -70,7 +70,7 @@ constant2(x) = FourierSeries([x])
     end
 end
 
-@testset "UniformCMPS: energy environments for bond dimension $D" for D in Dlist
+@testset "UniformCMPS: energy environments with bond dimension $D" for D in Dlist
     H = ∫(∂ψ'*∂ψ - 0.5*ψ'*ψ + 0.3*(ψ*ψ + ψ'*ψ') + 2.5*(ψ')^2*ψ^2, (-Inf,+Inf))
     for constant in (constant1, constant2)
         for T in (Float64, ComplexF64)
@@ -88,5 +88,83 @@ end
             @test abs(dot(HL,ρR)) <= 1e-9*norm(HL)
             @test abs(dot(ρL,HR)) <= 1e-9*norm(HR)
         end
+    end
+end
+
+@testset "UniformCMPS: local gradients with bond dimension D = $D" for D in Dlist
+    for constant in (constant1, constant2)
+        for T in (Float64, ComplexF64)
+            Q = constant(randn(T, (D,D)))
+            R1 = constant(randn(T, (D,D)))
+            R2 = constant(randn(T, (D,D)))
+            ρL = constant(randn(T, (D,D)))
+            ρL = (ρL + ρL')/2 # does not need to be the actual ρL for this test
+            ρR = constant(randn(T, (D,D)))
+            ρR = (ρR + ρR')/2 # does not need to be the actual ρL for this test
+            Rs = (R1,R2)
+
+            QR1 = Q*R1 - R1*Q
+            QR2 = Q*R2 - R2*Q
+
+            @test CMPSKit.localgradientQ(ψ[1], Q, Rs, ρL, ρR) == zero(Q)
+            @test CMPSKit.localgradientQ(ψ[1]^2, Q, Rs, ρL, ρR) == zero(Q)
+            @test CMPSKit.localgradientQ(∂ψ[1], Q, Rs, ρL, ρR) == zero(Q)
+            @test CMPSKit.localgradientQ(ψ[2]', Q, Rs, ρL, ρR) == zero(Q)
+            @test CMPSKit.localgradientQ((ψ[2]')^2, Q, Rs, ρL, ρR) == zero(Q)
+            @test CMPSKit.localgradientQ(∂(ψ[2]'), Q, Rs, ρL, ρR) ≈ ρL*ρR*R2' - R2'*ρL*ρR
+            @test CMPSKit.localgradientQ((∂ψ[1])'*∂ψ[2], Q, Rs, ρL, ρR) ≈
+                    ρL*QR2*ρR*R1' - R1'*ρL*QR2*ρR
+            @test CMPSKit.localgradientQ(ψ[1]'*ψ[2], Q, Rs, ρL, ρR) == zero(Q)
+            @test CMPSKit.localgradientQ((ψ[1]')^2*ψ[1]^2, Q, Rs, ρL, ρR) == zero(Q)
+
+            @test CMPSKit.localgradientRs(ψ[1], Q, Rs, ρL, ρR) == zero(Q)
+            @test CMPSKit.localgradientRs(ψ[1]^2, Q, Rs, ρL, ρR) == zero(Q)
+            @test CMPSKit.localgradientRs(∂ψ[1], Q, Rs, ρL, ρR) == zero(Q)
+            @test all(isapprox.(CMPSKit.localgradientRs(ψ[2]', Q, Rs, ρL, ρR),
+                                (zero(Q), ρL*ρR)))
+            @test all(isapprox.(CMPSKit.localgradientRs((ψ[2]')^2, Q, Rs, ρL, ρR),
+                                (zero(Q), R2'*ρL*ρR + ρL*ρR*R2')))
+            @test all(isapprox.(CMPSKit.localgradientRs(∂(ψ[2]'), Q, Rs, ρL, ρR),
+                                (zero(Q), Q'*ρL*ρR - ρL*ρR*Q' - ∂(ρL*ρR))))
+            @test all(isapprox.(CMPSKit.localgradientRs(∂(ψ[2]'), Q, Rs, ρL, ρR),
+                                (zero(Q), Q'*ρL*ρR - ρL*ρR*Q' - ∂(ρL*ρR))))
+            @test all(isapprox.(CMPSKit.localgradientRs((∂ψ[1])'*∂ψ[2], Q, Rs, ρL, ρR),
+                                (Q'*ρL*QR2*ρR - ρL*QR2*ρR*Q' - ∂(ρL*QR2*ρR), zero(Q))))
+            @test all(isapprox.(CMPSKit.localgradientRs(ψ[1]'*ψ[2], Q, Rs, ρL, ρR),
+                                (ρL*R2*ρR, zero(Q))))
+            @test all(isapprox.(CMPSKit.localgradientRs((ψ[1]')^2*ψ[1]^2, Q, Rs, ρL, ρR),
+                                (R1'*ρL*R1*R1*ρR + ρL*R1*R1*ρR*R1', zero(Q))))
+
+        end
+    end
+end
+
+@testset "UniformCMPS: global gradients with bond dimension D = $D" for D in Dlist
+    α = rand()
+    β = rand()
+    γ = rand()
+    H = ∫(∂ψ'*∂ψ + α*ψ'*ψ + β*(ψ*ψ + ψ'*ψ') + γ*(ψ')^2*ψ^2, (-Inf,+Inf))
+    for T in (Float64, ComplexF64)
+        Q = Constant(randn(T, (D,D)))
+        R = Constant(randn(T, (D,D)))
+
+        ΨL, = leftgauge!(InfiniteCMPS(Q, R))
+        QL = ΨL.Q
+        RL = ΨL.Rs[1]
+        ρR, = rightenv(ΨL; krylovdim = 50, tol = 1e-12)
+        ρL = one(ρR)
+        HL, = leftenv(H, (ΨL, ρL, ρR); krylovdim = 100, tol = 1e-12)
+        HR, = rightenv(H, (ΨL, ρL, ρR); krylovdim = 100, tol = 1e-12)
+
+        gradQ, gradRs = gradient(H, (ΨL, ρL, ρR), HL, HR)
+
+        QRL = QL*RL-RL*QL
+        gradR = gradRs[1]
+
+        @test gradQ ≈ ρL*QRL*ρR*RL' - RL'*ρL*QRL*ρR + HL*ρR + ρL*HR
+
+        @test gradR ≈ QL'*ρL*QRL*ρR - ρL*QRL*ρR*QL' + α*ρL*RL*ρR +
+                        β*RL'*ρL*ρR + β*ρL*ρR*RL' + γ*RL'*ρL*RL*RL*ρR + γ*ρL*RL*RL*ρR*RL' +
+                        HL*RL*ρR + ρL*RL*HR
     end
 end
