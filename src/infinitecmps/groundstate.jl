@@ -1,5 +1,7 @@
 function groundstate(H::LocalHamiltonian, Ψ₀::UniformCMPS;
-                            alg::OptimKit.OptimizationAlgorithm, kwargs...)
+                            alg::OptimKit.OptimizationAlgorithm,
+                            finalize! = OptimKit._finalize!,
+                            kwargs...)
 
     δ = 1
     function retract(x, d, α)
@@ -66,10 +68,10 @@ function groundstate(H::LocalHamiltonian, Ψ₀::UniformCMPS;
     scale!(d, α) = rmul!.(d, α)
     add!(d1, d2, α) = axpy!.(α, d2, d1)
 
-    function finalize!(x, E, d, numiter)
+    function _finalize!(x, E, d, numiter)
         normgrad2 = real(inner(x, d, d))
         δ = max(1e-12, 1e-3*normgrad2)
-        return x, E, d
+        return finalize!(x, E, d, numiter)
     end
 
     ΨL₀, = leftgauge(Ψ₀; kwargs...)
@@ -80,8 +82,9 @@ function groundstate(H::LocalHamiltonian, Ψ₀::UniformCMPS;
     x = (ΨL₀, ρR, HL, E, e, hL)
 
     x, E, normgrad, numfg, history =
-        optimize(fg, x, alg; retract = retract, precondition = precondition,
-                                finalize! = finalize!,
+        optimize(fg, x, alg; retract = retract,
+                                precondition = precondition,
+                                finalize! = _finalize!,
                                 inner = inner, transport! = transport!,
                                 scale! = scale!, add! = add!,
                                 isometrictransport = true)
