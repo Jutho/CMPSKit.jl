@@ -10,12 +10,12 @@ constant2(x) = FourierSeries([x])
             R1 = constant(randn(T, (D,D)))
             R2 = constant(randn(T, (D,D)))
             Ψ = InfiniteCMPS(Q, (R1,R2))
-            ρL, λL, infoL = leftenv(Ψ; krylovdim = 50, tol = 1e-12)
+            ρL, λL, infoL = leftenv(Ψ)
             TL = LeftTransfer(Ψ)
             @test norm(TL(ρL) - 2*λL*ρL) <= 10*infoL.normres[1]
             @test ρL == ρL'
 
-            ρR, λR, infoR = rightenv(Ψ; krylovdim = 50, tol = 1e-12)
+            ρR, λR, infoR = rightenv(Ψ)
             TR = RightTransfer(Ψ)
             @test norm(TR(ρR) - 2*λR*ρR) <= 10*infoR.normres[1]
             @test λL ≈ λR
@@ -25,28 +25,28 @@ constant2(x) = FourierSeries([x])
             @test imag(Z) <= sqrt(infoL.normres[1]*infoR.normres[1])
 
             Ψn = copy(Ψ)
-            ρL2, = leftenv!(Ψn; krylovdim = min(D^2,50), tol = 1e-12)
+            ρL2, = leftenv!(Ψn)
             @test ρL2 ≈ ρL
             Qn = Ψn.Q
             R1n, R2n = Ψn.Rs
             @test norm(Qn'*ρL + ρL*Qn + R1n'*ρL*R1n + R2n'*ρL*R2n) <= 1e-9
 
             Ψn = copy(Ψ)
-            ρR2, = rightenv!(Ψn; krylovdim = 50, tol = 1e-12)
+            ρR2, = rightenv!(Ψn)
             @test ρR2 ≈ ρR
             Qn = Ψn.Q
             R1n, R2n = Ψn.Rs
             @test norm(Qn*ρR + ρR*Qn' + R1n*ρR*R1n' + R2n*ρR*R2n') <= 1e-9
 
             Ψn = copy(Ψ)
-            ρL2, ρR2 = environments!(Ψn; krylovdim = 50, tol = 1e-12)
+            ρL2, ρR2 = environments!(Ψn)
             @test ρL2 ≈ ρL/sqrt(Z)
             @test ρR2 ≈ ρR/sqrt(Z)
             @test norm(LeftTransfer(Ψn)(ρL2)) <= 1e-9
             @test norm(RightTransfer(Ψn)(ρR2)) <= 1e-9
 
             if constant == constant1 # actual UniformCMPS
-                ΨL,λ,CL,info = leftgauge(Ψ; tol = 1e-12)
+                ΨL,λ,CL,info = leftgauge(Ψ)
                 @test λ ≈ λL
                 @test CL'*CL ≈ ρL/tr(ρL[])
                 QL = ΨL.Q
@@ -78,11 +78,13 @@ end
             R = constant(randn(T, (D,D)))
             Ψ = InfiniteCMPS(Q, R)
 
-            ρL, ρR = environments!(Ψ; krylovdim = 100, tol = 1e-12)
-            HL, eL, hL = leftenv(H, (Ψ,ρL,ρR); krylovdim = 100, tol = 1e-12)
-            HR, eR, hR = rightenv(H, (Ψ,ρL,ρR); krylovdim = 100, tol = 1e-12)
+            ρL, ρR = environments!(Ψ)
+            HL, EL, eL, hL = leftenv(H, (Ψ,ρL,ρR))
+            HR, ER, eR, hR = rightenv(H, (Ψ,ρL,ρR))
 
             @test eL ≈ eR
+            @test eL(0) ≈ EL
+            @test eR(0) ≈ ER
             @test norm(LeftTransfer(Ψ)(HL) + hL) <= 1e-9*norm(HL)
             @test norm(RightTransfer(Ψ)(HR) + hR) <= 1e-9*norm(HR)
             @test abs(dot(HL,ρR)) <= 1e-9*norm(HL)
@@ -117,9 +119,9 @@ end
             @test CMPSKit.localgradientQ(ψ[1]'*ψ[2], Q, Rs, ρL, ρR) == zero(Q)
             @test CMPSKit.localgradientQ((ψ[1]')^2*ψ[1]^2, Q, Rs, ρL, ρR) == zero(Q)
 
-            @test CMPSKit.localgradientRs(ψ[1], Q, Rs, ρL, ρR) == zero(Q)
-            @test CMPSKit.localgradientRs(ψ[1]^2, Q, Rs, ρL, ρR) == zero(Q)
-            @test CMPSKit.localgradientRs(∂ψ[1], Q, Rs, ρL, ρR) == zero(Q)
+            @test CMPSKit.localgradientRs(ψ[1], Q, Rs, ρL, ρR) == (zero(Q),zero(Q))
+            @test CMPSKit.localgradientRs(ψ[1]^2, Q, Rs, ρL, ρR) == (zero(Q),zero(Q))
+            @test CMPSKit.localgradientRs(∂ψ[1], Q, Rs, ρL, ρR) == (zero(Q),zero(Q))
             @test all(isapprox.(CMPSKit.localgradientRs(ψ[2]', Q, Rs, ρL, ρR),
                                 (zero(Q), ρL*ρR)))
             @test all(isapprox.(CMPSKit.localgradientRs((ψ[2]')^2, Q, Rs, ρL, ρR),
@@ -151,10 +153,10 @@ end
         ΨL, = leftgauge!(InfiniteCMPS(Q, R))
         QL = ΨL.Q
         RL = ΨL.Rs[1]
-        ρR, = rightenv(ΨL; krylovdim = 50, tol = 1e-12)
+        ρR, = rightenv(ΨL)
         ρL = one(ρR)
-        HL, = leftenv(H, (ΨL, ρL, ρR); krylovdim = 100, tol = 1e-12)
-        HR, = rightenv(H, (ΨL, ρL, ρR); krylovdim = 100, tol = 1e-12)
+        HL, = leftenv(H, (ΨL, ρL, ρR))
+        HR, = rightenv(H, (ΨL, ρL, ρR))
 
         gradQ, gradRs = gradient(H, (ΨL, ρL, ρR), HL, HR)
 

@@ -3,8 +3,8 @@ rightgauge(Ψ::UniformCMPS, args...; kwargs...) = rightgauge!(copy(Ψ), args...;
 
 function leftgauge!(Ψ::UniformCMPS, C₀ = one(Ψ.Q);
                     maxreorth = 10,
-                    maxiter = KrylovDefaults.maxiter,
-                    tol = KrylovDefaults.tol, extrakwargs...)
+                    eigalg = Arnoldi(; krylovdim = min(64, length(Ψ.Q[0]))),
+                    kwargs...)
 
     U = one(Ψ.Q)
     if Ψ.gauge == :l
@@ -12,13 +12,14 @@ function leftgauge!(Ψ::UniformCMPS, C₀ = one(Ψ.Q);
         info = ConvergenceInfo(1, nothing, η, 0, 1)
         return Ψ, zero(scalartype(Ψ)), U, info
     end
-    ρL, λ, info = leftenv(Ψ, C₀'*C₀; maxiter = maxiter, tol = tol, extrakwargs...)
+    tol = eigalg.tol
+    ρL, λ, info = leftenv(Ψ, C₀'*C₀; eigalg = eigalg, kwargs...)
     D, V = eigen!(Hermitian(ρL[]))
     Dsqrt = sqrt.(max.(D, defaulttol(D)))
     _, C = qr!(Diagonal(Dsqrt)*V')
     C ./= norm(C)
     CL = UpperTriangular(C)
-    
+
     Ψ.Q = Constant(rdiv!(CL*Ψ.Q[], CL))
     Qdiag = view(Ψ.Q[], diagind(Ψ.Q[]))
     Qdiag .-= λ
@@ -28,7 +29,7 @@ function leftgauge!(Ψ::UniformCMPS, C₀ = one(Ψ.Q);
     numiter = info.numiter
     numops = info.numops
     while η > tol
-        ρL, dλ, info = leftenv(Ψ, U; maxiter = maxiter, tol = tol, extrakwargs...)
+        ρL, dλ, info = leftenv(Ψ, U; eigalg = eigalg, kwargs...)
         numiter += info.numiter
         numops += info.numops
         D, V = eigen!(Hermitian(ρL[]))

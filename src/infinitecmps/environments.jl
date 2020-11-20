@@ -1,23 +1,23 @@
+defaulteigalg(Ψ::InfiniteCMPS) = Arnoldi(; krylovdim = min(64, virtualdim(Ψ₀)))
+defaultlinalg(Ψ::InfiniteCMPS) = GMRES(; krylovdim = min(256, virtualdim(Ψ₀)))
+
 function leftenv(Ψ::InfiniteCMPS, ρ₀ = one(Ψ.Q);
-                    tol = KrylovDefaults.tol,
-                    krylovdim = KrylovDefaults.krylovdim,
-                    maxiter = KrylovDefaults.maxiter,
-                    eager = false,
+                    eigalg = defaulteigalg(Ψ),
+                    linalg = nothing, # ignored
                     kwargs...)
 
-    alg = Arnoldi(; tol = tol, krylovdim = krylovdim, maxiter = maxiter, eager = eager)
     eigsort = EigSorter(x->(abs(div(imag(x), pi/period(Ψ))), -real(x)))
     let TL = LeftTransfer(Ψ)
-        _, ρs, λs, info = schursolve(ρ₀, 1, eigsort, alg) do x
-            y = -∂(x) + TL(x; tol = tol/10, kwargs...)
-            return truncate!(y; tol = tol/10, kwargs...)
+        _, ρs, λs, info = schursolve(ρ₀, 1, eigsort, eigalg) do x
+            y = -∂(x) + TL(x; tol = eigalg.tol/10, kwargs...)
+            return truncate!(y; tol = eigalg.tol/10, kwargs...)
         end
         λ, ρ = λs[1]/2, ρs[1]
         imag(λ) <= max(info.normres[1], defaulttol(λ)) ||
             @warn "Largest eigenvalue of transfer matrix not real? $λ"
         ρ = ρ + ρ'
         ρ = rmul!(ρ, 1/(norm(ρ)*sign(tr(ρ[0]))))
-        ρ = truncate!(ρ; tol = tol, kwargs...)
+        ρ = truncate!(ρ; tol = eigalg.tol/10, kwargs...)
         res = -∂(ρ) + TL(ρ) - (2*λ)*ρ
         newinfo = ConvergenceInfo(info.converged, res, norm(res), info.numiter, info.numops)
         return ρ, real(λ), newinfo
@@ -32,16 +32,13 @@ function leftenv!(Ψ::InfiniteCMPS, ρ₀ = one(Ψ.Q); kwargs...)
 end
 
 function rightenv(Ψ::InfiniteCMPS, ρ₀ = one(Ψ.Q);
-                    tol = KrylovDefaults.tol,
-                    krylovdim = KrylovDefaults.krylovdim,
-                    maxiter = KrylovDefaults.maxiter,
-                    eager = false,
+                    eigalg = defaulteigalg(Ψ),
+                    linalg = nothing, # ignored
                     kwargs...)
 
-    alg = Arnoldi(; tol = tol, krylovdim = krylovdim, maxiter = maxiter, eager = eager)
     eigsort = EigSorter(x->(abs(div(imag(x), pi/period(Ψ))), -real(x)))
     let TR = RightTransfer(Ψ)
-        _, ρs, λs, info = schursolve(ρ₀, 1, eigsort, alg) do x
+        _, ρs, λs, info = schursolve(ρ₀, 1, eigsort, eigalg) do x
                 y = ∂(x) + TR(x; kwargs...)
                 return truncate!(y; kwargs...)
             end
@@ -50,9 +47,10 @@ function rightenv(Ψ::InfiniteCMPS, ρ₀ = one(Ψ.Q);
             @warn "Largest eigenvalue of transfer matrix not real? $λ"
         ρ = ρ + ρ'
         ρ = rmul!(ρ, 1/(norm(ρ)*sign(tr(ρ[0]))))
-        ρ = truncate!(ρ; tol = tol, kwargs...)
-        info.normres[1] = norm(∂(ρ) + TR(ρ) - (2*real(λ))*ρ)
-        return ρ, real(λ), info
+        ρ = truncate!(ρ; tol = eigalg.tol/10, kwargs...)
+        res = ∂(ρ) + TR(ρ) - (2*real(λ))*ρ
+        newinfo = ConvergenceInfo(info.converged, res, norm(res), info.numiter, info.numops)
+        return ρ, real(λ), newinfo
     end
 end
 
@@ -99,13 +97,11 @@ const InfiniteCMPSData = Tuple{InfiniteCMPS,PeriodicMatrixFunction,PeriodicMatri
 
 # assumes Ψ is normalized and ⟨ρL|ρR⟩ = 1
 function leftenv(H::LocalHamiltonian, Ψρs::InfiniteCMPSData, HL₀ = nothing;
-                    tol = KrylovDefaults.tol,
-                    krylovdim = KrylovDefaults.krylovdim,
-                    maxiter = KrylovDefaults.maxiter,
-                    eager = false,
+                    eigalg = nothing, # ignored
+                    linalg = defaultlinalg(Ψρs[1]),
                     kwargs...)
 
-    (Ψ,ρL,ρR) = Ψρs
+    Ψ, ρL, ρR = Ψρs
     domain(H) == domain(Ψ) || throw(DomainMismatch())
 
     hL = leftreducedoperator(H.h, Ψ, ρL)
@@ -118,9 +114,9 @@ function leftenv(H::LocalHamiltonian, Ψρs::InfiniteCMPSData, HL₀ = nothing;
     else
         HL₀ = HL₀ - ρL * dot(HL₀, ρR)
     end
-    alg = GMRES(; tol = tol*norm(hL), krylovdim = krylovdim, maxiter = maxiter)
     let TL = LeftTransfer(Ψ)
-        HL, infoL = linsolve(hL, HL₀, alg) do x
+        tol = linalg.tol
+        HL, infoL = linsolve(hL, HL₀, linalg) do x
             y = ∂(x) - TL(x; tol = tol/10, kwargs...)
             y = axpy!(dot(ρR, x), ρL, y)
             truncate!(y; tol = tol/10, kwargs...)
@@ -134,13 +130,11 @@ function leftenv(H::LocalHamiltonian, Ψρs::InfiniteCMPSData, HL₀ = nothing;
 end
 
 function rightenv(H::LocalHamiltonian, Ψρs::InfiniteCMPSData, HR₀ = zero(Ψρs[1].Q);
-                    tol = KrylovDefaults.tol,
-                    krylovdim = KrylovDefaults.krylovdim,
-                    maxiter = KrylovDefaults.maxiter,
-                    eager = false,
+                    eigalg = nothing, # ignored
+                    linalg = defaultlinalg(Ψρs[1]),
                     kwargs...)
 
-    (Ψ,ρL,ρR) = Ψρs
+    Ψ, ρL, ρR = Ψρs
     domain(H) == domain(Ψ) || throw(DomainMismatch())
 
     hR = rightreducedoperator(H.h, Ψ, ρR)
@@ -149,9 +143,9 @@ function rightenv(H::LocalHamiltonian, Ψρs::InfiniteCMPSData, HR₀ = zero(Ψ�
     hR = axpy!(-ER, ρR, hR)
 
     HR₀ = HR₀ - ρR * dot(ρL, HR₀)
-    alg = GMRES(; tol = tol*norm(hR), krylovdim = krylovdim, maxiter = maxiter)
     let TR = RightTransfer(Ψ)
-        HR, infoR = linsolve(hR, HR₀, alg) do x
+        tol = linalg.tol
+        HR, infoR = linsolve(hR, HR₀, linalg) do x
             y = -∂(x) - TR(x; tol = tol/10, kwargs...)
             y = axpy!(dot(ρL, x), ρR, y)
             truncate!(y; tol = tol/10, kwargs...)

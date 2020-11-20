@@ -4,12 +4,13 @@ Dlist = (2,5,7,12)
         Q = FourierSeries([exp(-4*(j>>1))*randn(T, (D,D)) for j=1:5])
         R = FourierSeries([exp(-4*(j>>1))*randn(T, (D,D)) for j=1:3])
         Ψ = InfiniteCMPS(Q, R)
-        ρL, λL, infoL = leftenv(Ψ; Kmax = 20, krylovdim = 50, tol = 1e-12)
+
+        ρL, λL, infoL = leftenv(Ψ; Kmax = 20)
         TL = LeftTransfer(Ψ)
         @test norm(-∂(ρL) + TL(ρL) - 2*λL*ρL) <= 10*infoL.normres[1]
         @test ρL == ρL'
 
-        ρR, λR, infoR = rightenv(Ψ; Kmax = 20, krylovdim = 50, tol = 1e-12)
+        ρR, λR, infoR = rightenv(Ψ; Kmax = 20)
         TR = RightTransfer(Ψ)
         @test norm(∂(ρR) + TR(ρR) - 2*λR*ρR) <= 10*infoR.normres[1]
         @test λL ≈ λR
@@ -21,21 +22,21 @@ Dlist = (2,5,7,12)
         @test imag(Z) <= sqrt(infoL.normres[1]*infoR.normres[1])
 
         Ψn = copy(Ψ)
-        ρL2, = leftenv!(Ψn; Kmax = 20, krylovdim = 50, tol = 1e-12)
+        ρL2, = leftenv!(Ψn; Kmax = 20)
         @test ρL2 ≈ ρL
         Qn = Ψn.Q
         Rn, = Ψn.Rs
         @test norm(-∂(ρL)+Qn'*ρL2 + ρL*Qn + Rn'*ρL*Rn) <= 1e-9
 
         Ψn = copy(Ψ)
-        ρR2, = rightenv!(Ψn; Kmax = 20, krylovdim = 50, tol = 1e-12)
+        ρR2, = rightenv!(Ψn; Kmax = 20)
         @test ρR2 ≈ ρR
         Qn = Ψn.Q
         Rn, = Ψn.Rs
         @test norm(∂(ρR) + Qn*ρR + ρR*Qn' + Rn*ρR*Rn') <= 1e-9
 
         Ψn = copy(Ψ)
-        ρL2, ρR2 = environments!(Ψn; Kmax = 20, krylovdim = 50, tol = 1e-12)
+        ρL2, ρR2 = environments!(Ψn; Kmax = 20)
         @test ρL2 ≈ ρL/sqrt(Z)
         @test ρR2 ≈ ρR/sqrt(Z)
         Qn = Ψn.Q
@@ -54,9 +55,10 @@ end
         R = FourierSeries([exp(-4*(j>>1))*randn(T, (D,D)) for j=1:3])
         Ψ = InfiniteCMPS(Q, R)
 
-        ρL, ρR = environments!(Ψ; Kmax = 20, krylovdim = 100, tol = 1e-12)
-        HL, eL, hL = leftenv(H, (Ψ,ρL,ρR); Kmax = 30, krylovdim = 250, tol = 1e-12)
-        HR, eR, hR = rightenv(H, (Ψ,ρL,ρR); Kmax = 30, krylovdim = 250, tol = 1e-12)
+
+        ρL, ρR = environments!(Ψ; Kmax = 20)
+        HL, eL, hL = leftenv(H, (Ψ,ρL,ρR); Kmax = 30)
+        HR, eR, hR = rightenv(H, (Ψ,ρL,ρR); Kmax = 30)
 
         @test eL ≈ eR
         @test norm(∂(HL) - LeftTransfer(Ψ)(HL) - hL) <= 1e-9*norm(HL)
@@ -73,7 +75,7 @@ end
         R2 = FourierSeries([exp(-4*(j>>1))*randn(T, (D,D)) for j=1:3])
         Rs = (R1, R2)
         Ψ = InfiniteCMPS(Q, Rs)
-        ρL, ρR = environments!(Ψ; Kmax = 20, krylovdim = 100, tol = 1e-12)
+        ρL, ρR = environments!(Ψ; Kmax = 20)
 
         QR1 = Q*R1 - R1*Q + ∂(R1)
         QR2 = Q*R2 - R2*Q + ∂(R2)

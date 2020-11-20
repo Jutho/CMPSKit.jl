@@ -2,6 +2,7 @@ module CMPSKit
 
 export expval, average_energy, energy_density
 
+export virtualdim
 export leftenv, rightenv, leftenv!, rightenv!, environments!
 export leftgauge, rightgauge, leftgauge!, rightgauge!,
         leftcanonical, rightcanonical, leftcanonical!, rightcanonical!
