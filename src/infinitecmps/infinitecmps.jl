@@ -35,6 +35,6 @@ scalartype(::InfiniteCMPS{T}) where T = scalartype(T)
 
 Base.copy(Ψ::InfiniteCMPS) = InfiniteCMPS(copy(Ψ.Q), map(copy, Ψ.Rs); gauge = Ψ.gauge)
 
-virtualdim(Ψ::InfiniteCMPS) = size(Ψ.Q[0])
+virtualdim(Ψ::InfiniteCMPS) = size(Ψ.Q[0], 1)
 
 const UniformCMPS = InfiniteCMPS{<:Constant}
