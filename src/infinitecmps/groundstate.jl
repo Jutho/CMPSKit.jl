@@ -1,7 +1,7 @@
 function groundstate(H::LocalHamiltonian, Ψ₀::UniformCMPS;
-                        optalg = LBFGS(20; verbosity = 2),
-                        eigalg = KrylovKit.Arnoldi(; krylovdim = min(64, virtualdim(Ψ₀))),
-                        linalg = KrylovKit.GMRES(; krylovdim = min(256, virtualdim(Ψ₀))),
+                        optalg = ConjugateGradient(; verbosity = 2, gradtol = 1e-7),
+                        eigalg = defaulteigalg(Ψ₀),
+                        linalg = defaultlinalg(Ψ₀),
                         finalize! = OptimKit._finalize!,
                         kwargs...)
 
@@ -97,8 +97,8 @@ end
 
 function groundstate2(H::LocalHamiltonian, Ψ₀::UniformCMPS;
                         optalg = LBFGS(20; verbosity = 2),
-                        eigalg = KrylovKit.Arnoldi(; krylovdim = min(64, virtualdim(Ψ₀))),
-                        linalg = KrylovKit.GMRES(; krylovdim = min(256, virtualdim(Ψ₀))),
+                        eigalg = defaulteigalg(Ψ₀),
+                        linalg = defaultlinalg(Ψ₀),
                         finalize! = OptimKit._finalize!,
                         kwargs...)
 

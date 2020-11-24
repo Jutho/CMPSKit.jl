@@ -2,8 +2,8 @@ using CMPSKit
 using Test
 using LinearAlgebra
 using Random
-Random.seed!(1111)
+Random.seed!(111134)
 
-include("fourierseries.jl")
+include("functionseries.jl")
 include("uniformcmps.jl")
 include("periodiccmps.jl")

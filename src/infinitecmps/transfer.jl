@@ -38,12 +38,12 @@ end
 
 function (TR::RightTransfer)(x; kwargs...)
     y = similar(x, promote_type(scalartype(x), scalartype(TR)))
-    truncmul!(y, TR.Q₁, x; kwargs...)
-    truncmul!(y, x, TR.Q₂', 1, 1; kwargs...)
+    truncmul!(y, TR.Q₂, x; kwargs...)
+    truncmul!(y, x, TR.Q₁', 1, 1; kwargs...)
     z = similar(y)
     for (R₁, R₂) in zip(TR.R₁s, TR.R₂s)
-        mul!(z, R₁, x)
-        truncmul!(y, z, R₂', 1, 1; kwargs...)
+        mul!(z, R₂, x)
+        truncmul!(y, z, R₁', 1, 1; kwargs...)
     end
     return y
 end

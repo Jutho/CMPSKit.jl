@@ -57,10 +57,11 @@ end
 
 
         ρL, ρR = environments!(Ψ; Kmax = 20)
-        HL, eL, hL = leftenv(H, (Ψ,ρL,ρR); Kmax = 30)
-        HR, eR, hR = rightenv(H, (Ψ,ρL,ρR); Kmax = 30)
+        HL, EL, eL, hL = leftenv(H, (Ψ,ρL,ρR); Kmax = 30)
+        HR, ER, eR, hR = rightenv(H, (Ψ,ρL,ρR); Kmax = 30)
 
         @test eL ≈ eR
+        @test EL ≈ ER
         @test norm(∂(HL) - LeftTransfer(Ψ)(HL) - hL) <= 1e-9*norm(HL)
         @test norm(∂(HR) + RightTransfer(Ψ)(HR) + hR) <= 1e-9*norm(HR)
         @test abs(dot(HL,ρR)) <= 1e-9*norm(HL)
@@ -91,9 +92,9 @@ end
         @test CMPSKit.localgradientQ(ψ[1]'*ψ[2], Q, Rs, ρL, ρR) == zero(Q)
         @test CMPSKit.localgradientQ((ψ[1]')^2*ψ[1]^2, Q, Rs, ρL, ρR) == zero(Q)
 
-        @test CMPSKit.localgradientRs(ψ[1], Q, Rs, ρL, ρR) == zero(Q)
-        @test CMPSKit.localgradientRs(ψ[1]^2, Q, Rs, ρL, ρR) == zero(Q)
-        @test CMPSKit.localgradientRs(∂ψ[1], Q, Rs, ρL, ρR) == zero(Q)
+        @test CMPSKit.localgradientRs(ψ[1], Q, Rs, ρL, ρR) == (zero(Q), zero(Q))
+        @test CMPSKit.localgradientRs(ψ[1]^2, Q, Rs, ρL, ρR) == (zero(Q), zero(Q))
+        @test CMPSKit.localgradientRs(∂ψ[1], Q, Rs, ρL, ρR) == (zero(Q), zero(Q))
         @test all(isapprox.(CMPSKit.localgradientRs(ψ[2]', Q, Rs, ρL, ρR),
                             (zero(Q), ρL*ρR)))
         @test all(isapprox.(CMPSKit.localgradientRs((ψ[2]')^2, Q, Rs, ρL, ρR),

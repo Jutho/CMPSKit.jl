@@ -152,9 +152,9 @@ end
 differentiate(F::Constant) = zero(F)
 integrate(F::Constant, (a,b)::Tuple{Real,Real}) = F[]*(b-a)
 
-# Fit constant: take average over 5 points
-fit(f, ::Type{Constant}, (a,b)::Tuple{Real,Real}) =
-    Constant(mean(f, range(a, b; length = 5)))
+# Fit constant: take average over N points
+fit(f, ::Type{Constant}, (a,b)::Tuple{Real,Real}; N = 5) =
+    Constant(sum(f, range(a, b; length = N))/N)
 
 # Inverse and square root
 Base.inv(F::Constant) = Constant(inv(F[]))

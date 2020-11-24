@@ -1,5 +1,13 @@
-defaulteigalg(Ψ::InfiniteCMPS) = Arnoldi(; krylovdim = min(64, virtualdim(Ψ)))
-defaultlinalg(Ψ::InfiniteCMPS) = GMRES(; krylovdim = min(256, virtualdim(Ψ)))
+defaulteigalg(Ψ::UniformCMPS) =
+    Arnoldi(; krylovdim = min(64, virtualdim(Ψ)^2))
+defaultlinalg(Ψ::UniformCMPS) =
+    GMRES(; krylovdim = min(256, virtualdim(Ψ)^2))
+
+defaulteigalg(Ψ::InfiniteCMPS{<:FourierSeries}) =
+    Arnoldi(; krylovdim = min(64, (10*nummodes(Ψ.Q)+1)*virtualdim(Ψ)^2))
+defaultlinalg(Ψ::InfiniteCMPS{<:FourierSeries}) =
+    GMRES(; krylovdim = min(256, (10*nummodes(Ψ.Q)+1)*virtualdim(Ψ)^2))
+
 
 function leftenv(Ψ::InfiniteCMPS, ρ₀ = one(Ψ.Q);
                     eigalg = defaulteigalg(Ψ),

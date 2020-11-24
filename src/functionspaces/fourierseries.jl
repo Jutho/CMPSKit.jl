@@ -381,6 +381,9 @@ end
 
 # Simple Fourier transform: typically not needed for large number of points, but should
 # work with matrix valued functions etc
+fit(f, ::Type{FourierSeries}, (a,b)::Tuple{Real,Real}; kwargs...) =
+    fit(f, FourierSeries, b-a; kwargs...)
+
 function fit(f, ::Type{FourierSeries}, period = 1; Kmax = 10, tol = 1e-12)
     K = Kmax
     x = (0:2*K) * (period / (2K+1))
