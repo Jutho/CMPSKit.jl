@@ -88,6 +88,7 @@ Base.one(F::FourierSeries) = FourierSeries([one(F[0])], period(F))
 Base.copy(F::FourierSeries) = FourierSeries(copy.(coefficients(F)), period(F))
 
 Base.:-(F::FourierSeries) = FourierSeries(.-coefficients(F), period(F))
+Base.:+(F::FourierSeries) = FourierSeries(.+coefficients(F), period(F))
 
 const Const = Union{Number,AbstractArray}
 Base.:*(F::FourierSeries, a::Const) =
@@ -208,30 +209,6 @@ function LinearAlgebra.lmul!(α::Number, F::FourierSeries)
     return F
 end
 
-function LinearAlgebra.mul!(Fdst::FourierSeries, α::Number, Fsrc::FourierSeries)
-    domain(Fdst) == domain(Fsrc) || throw(DomainMismatch())
-    setnummodes!(Fdst, nummodes(Fsrc))
-    if eltype(Fdst) <: Number
-        mul!(coefficients(Fdst), α, coefficients(Fsrc))
-    else
-        for k in eachindex(Fdst)
-            mul!(Fdst[k], α, Fsrc[k])
-        end
-    end
-    return Fdst
-end
-function LinearAlgebra.mul!(Fdst::FourierSeries, Fsrc::FourierSeries, α::Number)
-    domain(Fdst) == domain(Fsrc) || throw(DomainMismatch())
-    setnummodes!(Fdst, nummodes(Fsrc))
-    if eltype(Fdst) <: Number
-        mul!(coefficients(Fdst), coefficients(Fsrc), α)
-    else
-        for k in eachindex(Fdst)
-            mul!(Fdst[k], Fsrc[k], α)
-        end
-    end
-    return Fdst
-end
 function LinearAlgebra.axpy!(α::Number, Fx::FourierSeries, Fy::FourierSeries)
     domain(Fx) == domain(Fy) || throw(DomainMismatch())
     Kx = nummodes(Fx)
@@ -276,16 +253,50 @@ function LinearAlgebra.axpby!(α::Number, Fx::FourierSeries, β::Number, Fy::Fou
     return Fy
 end
 
+LinearAlgebra.mul!(Fdst::FourierSeries, α::Number, Fsrc::FourierSeries) =
+    truncmul!(Fdst, α, Fsrc)
+LinearAlgebra.mul!(Fdst::FourierSeries, Fsrc::FourierSeries, α::Number) =
+    truncmul!(Fdst, Fsrc, α)
 LinearAlgebra.mul!(F::FourierSeries, F1::FourierSeries, F2::FourierSeries,
                     α = true, β = false) = truncmul!(F, F1, F2, α, β)
 
+function truncmul!(Fdst::FourierSeries, α₁::Number, Fsrc::FourierSeries,
+                    α₂ = true, β = false;
+                    Kmax::Integer = nummodes(Fsrc), tol::Real = 0)
+    α = α₁ * α₂
+    domain(Fdst) == domain(Fsrc) || throw(DomainMismatch())
+    setnummodes!(Fdst, Kmax)
+    if eltype(Fdst) <: Number
+        mul!(coefficients(Fdst), α, coefficients(Fsrc))
+    else
+        for k in eachindex(Fdst)
+            mul!(Fdst[k], α, Fsrc[k])
+        end
+    end
+    return Fdst
+end
+function truncmul!(Fdst::FourierSeries, Fsrc::FourierSeries, α₁::Number,
+                    α₂ = true, β = false;
+                    Kmax::Integer = nummodes(Fsrc), tol::Real = 0)
+    α = α₁ * α₂
+    domain(Fdst) == domain(Fsrc) || throw(DomainMismatch())
+    setnummodes!(Fdst, Kmax)
+    if eltype(Fdst) <: Number
+        mul!(coefficients(Fdst), coefficients(Fsrc), α)
+    else
+        for k in eachindex(Fdst)
+            mul!(Fdst[k], Fsrc[k], α)
+        end
+    end
+    return Fdst
+end
 function truncmul!(F::FourierSeries, F1::FourierSeries, F2::FourierSeries,
                     α = true, β = false;
-                    Kmax::Integer = nummodes(F1)+nummodes(F2), tol::Real = 0)
+                    Kmax::Integer = max(nummodes(F), nummodes(F1)+nummodes(F2)), tol::Real = 0)
     domain(F) == domain(F1) == domain(F2) || throw(DomainMismatch())
     K1 = nummodes(F1)
     K2 = nummodes(F2)
-    K = min(Kmax, K1+K2)
+    K = min(Kmax, max(iszero(β) ? 0 : nummodes(F), K1+K2))
     setnummodes!(F, K)
     Threads.@threads for k = -K:K
         fk = F[k]

@@ -1,3 +1,4 @@
+# groundstate with UniformCMPS
 function groundstate(H::LocalHamiltonian, Ψ₀::UniformCMPS;
                         optalg = ConjugateGradient(; verbosity = 2, gradtol = 1e-7),
                         eigalg = defaulteigalg(Ψ₀),
@@ -29,14 +30,14 @@ function groundstate(H::LocalHamiltonian, Ψ₀::UniformCMPS;
         end
 
         ΨL = InfiniteCMPS(QL, RLs; gauge = :left)
-        ρR, λ, infoR = rightenv(ΨL; eigalg = eigalg, linalg = linalg, kwargs...)
+        ρR, λ, infoR = rightenv(ΨL, ρR; eigalg = eigalg, linalg = linalg, kwargs...)
         rmul!(ρR, 1/tr(ρR[]))
         ρL = one(ρR)
         HL, E, e, hL, infoL =
-            leftenv(H, (ΨL,ρL,ρR); eigalg = eigalg, linalg = linalg, kwargs...)
+            leftenv(H, (ΨL, ρL, ρR); eigalg = eigalg, linalg = linalg, kwargs...)
 
         if infoR.converged == 0 || infoL.converged == 0
-            @warn "step $α : not converged, energy = $e"
+            @warn "step $α : not converged, energy = $E"
             @show infoR
             @show infoL
         end
@@ -77,12 +78,18 @@ function groundstate(H::LocalHamiltonian, Ψ₀::UniformCMPS;
         return finalize!(x, E, d, numiter)
     end
 
-    ΨL₀, = leftgauge(Ψ₀; kwargs...)
-    ρR, λ, infoR = rightenv(ΨL₀; kwargs...)
+    ΨL, = leftgauge(Ψ₀; kwargs...)
+    ρR, λ, infoR = rightenv(ΨL; kwargs...)
     ρL = one(ρR)
     rmul!(ρR, 1/tr(ρR[]))
-    HL, E, e, hL, infoL = leftenv(H, (ΨL₀,ρL,ρR); kwargs...)
-    x = (ΨL₀, ρR, HL, E, e, hL)
+    HL, E, e, hL, infoL = leftenv(H, (ΨL,ρL,ρR); kwargs...)
+    x = (ΨL, ρR, HL, E, e, hL)
+
+    if infoR.converged == 0 || infoL.converged == 0
+        @warn "initial point not converged, energy = $E"
+        @show infoR
+        @show infoL
+    end
 
     x, E, normgrad, numfg, history =
         optimize(fg, x, optalg; retract = retract,
@@ -95,45 +102,35 @@ function groundstate(H::LocalHamiltonian, Ψ₀::UniformCMPS;
     return ΨL, ρR, E, e, normgrad, numfg, history
 end
 
-function groundstate2(H::LocalHamiltonian, Ψ₀::UniformCMPS;
-                        optalg = LBFGS(20; verbosity = 2),
+function groundstate(H::LocalHamiltonian, Ψ₀::FourierCMPS;
+                        optalg = ConjugateGradient(; verbosity = 2, gradtol = 1e-7),
                         eigalg = defaulteigalg(Ψ₀),
                         linalg = defaultlinalg(Ψ₀),
                         finalize! = OptimKit._finalize!,
+                        test = false,
                         kwargs...)
 
-    δ = 1
     function retract(x, d, α)
-        ΨL, = x
+        ΨL, ρR, HL, = x
         QL = ΨL.Q
         RLs = ΨL.Rs
-        KL = copy(QL)
-        for R in RLs
-            mul!(KL, R', R, +1/2, 1)
-        end
+        dK, dRs = d
 
-        dRs = d
-        RdR = zero(QL)
-        for (R, dR) in zip(RLs, dRs)
-            mul!(RdR, R', dR, true, true)
-        end
+        RdR = sum(adjoint.(RLs) .* dRs)
+        dRdR = sum(adjoint.(dRs) .* dRs)
 
+        QL = QL + α * dK - α * RdR - (α * α / 2) * dRdR
         RLs = RLs .+ α .* dRs
-        KL = KL - (α/2) * (RdR - RdR')
-        QL = KL
-        for R in RLs
-            mul!(QL, R', R, -1/2, 1)
-        end
 
         ΨL = InfiniteCMPS(QL, RLs; gauge = :left)
-        ρR, λ, infoR = rightenv(ΨL; eigalg = eigalg, linalg = linalg, kwargs...)
-        rmul!(ρR, 1/tr(ρR[]))
+        ρR, λ, infoR = rightenv(ΨL, ρR; eigalg = eigalg, linalg = linalg, kwargs...)
+        rmul!(ρR, 1/tr(ρR[0]))
         ρL = one(ρR)
         HL, E, e, hL, infoL =
-            leftenv(H, (ΨL,ρL,ρR); eigalg = eigalg, linalg = linalg, kwargs...)
+            leftenv(H, (ΨL, ρL, ρR); eigalg = eigalg, linalg = linalg, kwargs...)
 
         if infoR.converged == 0 || infoL.converged == 0
-            @warn "step $α : not converged, energy = $e"
+            @warn "step $α : not converged, energy = $E"
             @show infoR
             @show infoL
         end
@@ -144,47 +141,62 @@ function groundstate2(H::LocalHamiltonian, Ψ₀::UniformCMPS;
     transport!(v, x, d, α, xnew) = v # simplest possible transport
 
     function inner(x, d1, d2)
-        return 2*real(sum(dot.(d1, d2)))
-    end
-
-    function precondition(x, d)
-        ΨL, ρR, = x
-        dRs = d
-        return dRs .* Ref(posreginv(ρR[0], δ))
+        dK1, dR1 = d1
+        dK2, dR2 = d2
+        return 2*real(dot(dK1, dK2)) + 2*real(dot(dR1, dR2))
     end
 
     function fg(x)
-        (ΨL, ρR, HL, E, e, hL) = x
+        ΨL, ρR, HL, E, e, hL = x
 
         gradQ, gradRs = gradient(H, (ΨL, one(ρR), ρR), HL, zero(HL); kwargs...)
 
-        Rs = ΨL.Rs
+        Q = ΨL.Q
+        RLs = ΨL.Rs
 
-        dRs = .-(Rs) .* Ref(gradQ) .+ gradRs
+        dK = truncate!((gradQ - gradQ')/2; Kmax = nummodes(Q))
+        dRs = truncate!.((.-(RLs)) .* (gradQ,) .+ gradRs; Kmax = nummodes(RLs[1]))
 
-        return E, dRs
+        return E, (dK, dRs)
     end
 
-    scale!(d, α) = rmul!.(d, α)
-    add!(d1, d2, α) = axpy!.(α, d2, d1)
-
-    function _finalize!(x, E, d, numiter)
-        normgrad2 = real(inner(x, d, d))
-        δ = max(1e-12, 1e-3*normgrad2)
-        return finalize!(x, E, d, numiter)
+    function scale!(d, α)
+        dK, dRs = d
+        dK = rmul!(dK, α)
+        dRs = rmul!.(dRs, α)
+        return (dK, dRs)
     end
 
-    ΨL₀, = leftgauge(Ψ₀; kwargs...)
-    ρR, λ, infoR = rightenv(ΨL₀; kwargs...)
+    function add!(d1, d2, α)
+        dK1, dR1s = d1
+        dK2, dR2s = d2
+        axpy!(α, dK2, dK1)
+        axpy!.(α, dR2s, dR1s)
+        return (dK1, dR1s)
+    end
+
+    ΨL = Ψ₀
+    ρR, λ, infoR = rightenv(ΨL; kwargs...)
     ρL = one(ρR)
-    rmul!(ρR, 1/tr(ρR[]))
-    HL, E, e, hL, infoL = leftenv(H, (ΨL₀,ρL,ρR); kwargs...)
-    x = (ΨL₀, ρR, HL, E, e, hL)
+    @assert norm(LeftTransfer(ΨL)(ρL)) < 1e-12
+    rmul!(ρR, 1/tr(ρR[0]))
+    HL, E, e, hL, infoL = leftenv(H, (ΨL,ρL,ρR); kwargs...)
+    x = (ΨL, ρR, HL, E, e, hL)
+
+    if infoR.converged == 0 || infoL.converged == 0
+        @warn "initial point not converged, energy = $E"
+        @show infoR
+        @show infoL
+    end
+
+    if test
+        return optimtest(fg, x; alpha = -0.1:0.01:0.1, retract = retract, inner = inner)
+    end
 
     x, E, normgrad, numfg, history =
         optimize(fg, x, optalg; retract = retract,
-                                precondition = precondition,
-                                finalize! = _finalize!,
+                                # precondition = precondition,
+                                # finalize! = _finalize!,
                                 inner = inner, transport! = transport!,
                                 scale! = scale!, add! = add!,
                                 isometrictransport = true)

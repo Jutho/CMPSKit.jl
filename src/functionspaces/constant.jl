@@ -121,7 +121,7 @@ LinearAlgebra.mul!(F::Constant, F1::Constant, F2::Constant,
 
 function truncmul!(F::Constant, F1::Constant, F2::Constant,
                     α = true, β = false;
-                    Kmax::Integer = 1, tol::Real = 0)
+                    Kmax::Integer = 0, tol::Real = 0)
 
     if eltype(F) <: Number || (eltype(F1) <: Number && eltype(F2) <: Number)
         F[] = α * F1[] + β * F[2]

@@ -1,13 +1,10 @@
-defaulteigalg(Ψ::UniformCMPS) =
-    Arnoldi(; krylovdim = min(64, virtualdim(Ψ)^2))
-defaultlinalg(Ψ::UniformCMPS) =
-    GMRES(; krylovdim = min(256, virtualdim(Ψ)^2))
+defaulteigalg(Ψ::UniformCMPS) = Arnoldi(; krylovdim = min(256, virtualdim(Ψ)^2))
+defaultlinalg(Ψ::UniformCMPS) = GMRES(; krylovdim = min(256, virtualdim(Ψ)^2))
 
-defaulteigalg(Ψ::InfiniteCMPS{<:FourierSeries}) =
-    Arnoldi(; krylovdim = min(64, (10*nummodes(Ψ.Q)+1)*virtualdim(Ψ)^2))
-defaultlinalg(Ψ::InfiniteCMPS{<:FourierSeries}) =
+defaulteigalg(Ψ::FourierCMPS) =
+    Arnoldi(; krylovdim = min(256, (10*nummodes(Ψ.Q)+1)*virtualdim(Ψ)^2))
+defaultlinalg(Ψ::FourierCMPS) =
     GMRES(; krylovdim = min(256, (10*nummodes(Ψ.Q)+1)*virtualdim(Ψ)^2))
-
 
 function leftenv(Ψ::InfiniteCMPS, ρ₀ = one(Ψ.Q);
                     eigalg = defaulteigalg(Ψ),
@@ -25,7 +22,7 @@ function leftenv(Ψ::InfiniteCMPS, ρ₀ = one(Ψ.Q);
             @warn "Largest eigenvalue of transfer matrix not real? $λ"
         ρ = ρ + ρ'
         ρ = rmul!(ρ, 1/(norm(ρ)*sign(tr(ρ[0]))))
-        ρ = truncate!(ρ; tol = eigalg.tol/10, kwargs...)
+        ρ = truncate!(ρ; tol = eigalg.tol/100, kwargs...)
         res = -∂(ρ) + TL(ρ) - (2*λ)*ρ
         newinfo = ConvergenceInfo(info.converged, res, norm(res), info.numiter, info.numops)
         return ρ, real(λ), newinfo
@@ -48,14 +45,14 @@ function rightenv(Ψ::InfiniteCMPS, ρ₀ = one(Ψ.Q);
     let TR = RightTransfer(Ψ)
         _, ρs, λs, info = schursolve(ρ₀, 1, eigsort, eigalg) do x
                 y = ∂(x) + TR(x; kwargs...)
-                return truncate!(y; kwargs...)
+                return truncate!(y; tol = eigalg.tol/100, kwargs...)
             end
         λ, ρ = λs[1]/2, ρs[1]
         imag(λ) <= max(info.normres[1], defaulttol(λ)) ||
             @warn "Largest eigenvalue of transfer matrix not real? $λ"
         ρ = ρ + ρ'
         ρ = rmul!(ρ, 1/(norm(ρ)*sign(tr(ρ[0]))))
-        ρ = truncate!(ρ; tol = eigalg.tol/10, kwargs...)
+        ρ = truncate!(ρ; tol = eigalg.tol/100, kwargs...)
         res = ∂(ρ) + TR(ρ) - (2*real(λ))*ρ
         newinfo = ConvergenceInfo(info.converged, res, norm(res), info.numiter, info.numops)
         return ρ, real(λ), newinfo
@@ -123,14 +120,13 @@ function leftenv(H::LocalHamiltonian, Ψρs::InfiniteCMPSData, HL₀ = nothing;
         HL₀ = HL₀ - ρL * dot(HL₀, ρR)
     end
     let TL = LeftTransfer(Ψ)
-        tol = linalg.tol
         HL, infoL = linsolve(hL, HL₀, linalg) do x
-            y = ∂(x) - TL(x; tol = tol/10, kwargs...)
+            y = ∂(x) - TL(x; kwargs...)
             y = axpy!(dot(ρR, x), ρL, y)
-            truncate!(y; tol = tol/10, kwargs...)
+            truncate!(y; tol = linalg.tol/100, kwargs...)
         end
         HL = rmul!(HL + HL', 0.5)
-        HL = truncate!(HL; tol = tol/10, kwargs...)
+        truncate!(HL; tol = linalg.tol/100, kwargs...)
         res = hL - (∂(HL)-TL(HL))
         infoL = ConvergenceInfo(infoL.converged, res, norm(res), infoL.numiter, infoL.numops)
         return HL, EL, eL, hL, infoL
@@ -152,14 +148,14 @@ function rightenv(H::LocalHamiltonian, Ψρs::InfiniteCMPSData, HR₀ = zero(Ψ�
 
     HR₀ = HR₀ - ρR * dot(ρL, HR₀)
     let TR = RightTransfer(Ψ)
-        tol = linalg.tol
         HR, infoR = linsolve(hR, HR₀, linalg) do x
-            y = -∂(x) - TR(x; tol = tol/10, kwargs...)
+            y = -∂(x) - TR(x; kwargs...)
             y = axpy!(dot(ρL, x), ρR, y)
-            truncate!(y; tol = tol/10, kwargs...)
+            truncate!(y; tol = linalg.tol/100, kwargs...)
         end
         HR = rmul!(HR + HR', 0.5)
-        HR = truncate!(HR; tol = tol/10, kwargs...)
+        res = hR - (-∂(HR)-TR(HR))
+        truncate!(HR; tol = linalg.tol/100, kwargs...)
         res = hR - (-∂(HR)-TR(HR))
         infoR = ConvergenceInfo(infoR.converged, res, norm(res), infoR.numiter, infoR.numops)
         return HR, ER, eR, hR, infoR

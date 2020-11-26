@@ -111,3 +111,31 @@ end
                             (R1'*ρL*R1*R1*ρR + ρL*R1*R1*ρR*R1', zero(Q))))
     end
 end
+
+@testset "PeriodicCMPS: global gradients with bond dimension D = $D" for D in Dlist
+    α = fit(x->-1 + 0.8*sin(x), FourierSeries; Kmax = 1)
+    β = rand()
+    γ = rand()
+    H = ∫(∂ψ'*∂ψ + α*ψ'*ψ + γ*(ψ')^2*ψ^2, (-Inf,+Inf))
+    T = ComplexF64
+    Q = FourierSeries([exp(-4*(j>>1))*randn(T, (D,D)) for j=1:5])
+    R = FourierSeries([exp(-4*(j>>1))*randn(T, (D,D)) for j=1:3])
+    Ψ = InfiniteCMPS(Q, R)
+    ρL, ρR = environments!(Ψ; Kmax = 20)
+
+    HL, = leftenv(H, (Ψ, ρL, ρR); Kmax = 20)
+    HR, = rightenv(H, (Ψ, ρL, ρR); Kmax = 20)
+
+    gradQ, gradRs = gradient(H, (Ψ, ρL, ρR), HL, HR)
+
+    QL = Ψ.Q
+    RL = Ψ.Rs[1]
+    QRL = QL*RL-RL*QL
+    𝒟R = QRL + ∂(RL)
+    gradR = gradRs[1]
+
+    @test gradQ ≈ ρL*𝒟R*ρR*RL' - RL'*ρL*𝒟R*ρR + HL*ρR + ρL*HR
+
+    @test gradR ≈ -differentiate(ρL*𝒟R*ρR) + QL'*ρL*𝒟R*ρR - ρL*𝒟R*ρR*QL' +
+                    α*ρL*RL*ρR + β*RL'*ρL*ρR + β*ρL*ρR*RL' + γ*RL'*ρL*RL*RL*ρR + γ*ρL*RL*RL*ρR*RL' + HL*RL*ρR + ρL*RL*HR
+end

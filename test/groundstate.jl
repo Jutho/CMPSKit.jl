@@ -8,15 +8,15 @@ using JLD2
 D = 16
 
 Q = Constant(randn(D,D))
-R = Constant(randn(D,D))
-Ψ = InfiniteCMPS(Q, R)
+R1 = Constant(randn(D,D))
+R2 = Constant(randn(D,D))
+Ψ = InfiniteCMPS(Q, (R1, R2))
 
 alg = ConjugateGradient(; verbosity = 2, maxiter = 10^6, gradtol = 1e-4);
 
-H = ∫(∂ψ'*∂ψ - 10000 * ψ'*ψ + 1000 * (ψ')^2*ψ^2, (-Inf,+Inf))
-
-
-H = ∫(∂ψ'*∂ψ - 1 * ψ'*ψ + 1 * (ψ')^2*ψ^2, (-Inf,+Inf))
+H = ∫(∂ψ[1]'*∂ψ[1] - 1 * ψ[1]'*ψ[1] + 1 * (ψ[1]')^2*ψ[1]^2 +
+        ∂ψ[2]'*∂ψ[2] - 1 * ψ[2]'*ψ[2] + 1 * (ψ[2]')^2*ψ[2]^2 +
+        100 * (ψ[1]*ψ[2] - ψ[2]*ψ[1])' * (ψ[1]*ψ[2] - ψ[2]*ψ[1]), (-Inf,+Inf))
 
 # function finalize!(x, f, g, numiter)
 #     if mod(numiter, 1000) == 0

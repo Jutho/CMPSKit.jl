@@ -11,17 +11,29 @@ function gradient(H::LocalHamiltonian, Ψρs::InfiniteCMPSData, HL = nothing, HR
     Q = Ψ.Q
     Rs = Ψ.Rs
 
+    # gradQ = ∑(coeff * localgradientQ)  +  HL*ρR + ρL*HR
     gradQ = zero(Q)
     for (coeff, op) in zip(coefficients(H.h), operators(H.h))
-        gradQ = gradQ + coeff * localgradientQ(op, Q, Rs, ρL, ρR)
+        if coeff isa Number
+            axpy!(coeff, localgradientQ(op, Q, Rs, ρL, ρR), gradQ)
+        else
+            mul!(gradQ, coeff, localgradientQ(op, Q, Rs, ρL, ρR), 1, 1)
+        end
     end
-    gradQ += HL*ρR + ρL*HR
+    mul!(gradQ, HL, ρR, 1, 1)
+    mul!(gradQ, ρL, HR, 1, 1)
 
+    # gradR = ∑(coeff * localgradientR)  +  HL*R*ρR + ρL*R*HR
     gradRs = zero.(Rs)
     for (coeff, op) in zip(coefficients(H.h), operators(H.h))
-        gradRs = gradRs .+ Ref(coeff) .* localgradientRs(op, Q, Rs, ρL, ρR)
+        if coeff isa Number
+            axpy!.(coeff, localgradientRs(op, Q, Rs, ρL, ρR), gradRs)
+        else
+            mul!.(gradRs, (coeff,), localgradientRs(op, Q, Rs, ρL, ρR), 1, 1)
+        end
     end
-    gradRs = gradRs .+ Ref(HL) .* Rs .* Ref(ρR) .+ Ref(ρL) .* Rs .* Ref(HR)
+    mul!.(gradRs, (HL,), Rs .* (ρR,), 1, 1)
+    mul!.(gradRs, (ρL,), Rs .* (HR,), 1, 1)
 
     return gradQ, gradRs
 end
