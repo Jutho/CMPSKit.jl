@@ -116,7 +116,7 @@ end
     α = fit(x->-1 + 0.8*sin(x), FourierSeries; Kmax = 1)
     β = rand()
     γ = rand()
-    H = ∫(∂ψ'*∂ψ + α*ψ'*ψ + γ*(ψ')^2*ψ^2, (-Inf,+Inf))
+    H = ∫(∂ψ'*∂ψ + α*ψ'*ψ + β*(ψ*ψ + ψ'*ψ') + γ*(ψ')^2*ψ^2, (-Inf,+Inf))
     T = ComplexF64
     Q = FourierSeries([exp(-4*(j>>1))*randn(T, (D,D)) for j=1:5])
     R = FourierSeries([exp(-4*(j>>1))*randn(T, (D,D)) for j=1:3])
