@@ -170,3 +170,28 @@ end
                         HL*RL*ρR + ρL*RL*HR
     end
 end
+
+@testset "UniformCMPS: test ground state algorithm" begin
+    D = 4
+    T = Float64
+    α = -1
+    β = 1//2
+    γ = float(pi)
+    H = ∫(∂ψ'*∂ψ + α*ψ'*ψ + β*(ψ*ψ + ψ'*ψ') + γ*(ψ')^2*ψ^2, (-Inf,+Inf))
+
+    gradtol = 1e-7
+    optalg = ConjugateGradient(; gradtol = gradtol)
+    eigalg = Arnoldi(; krylovdim = 16, tol = 1e-10)
+    linalg = GMRES(; krylovdim = 16, tol = 1e-10)
+    for k = 1:3
+        Q = Constant(randn(T, (D,D)))
+        R = Constant(randn(T, (D,D)))
+
+        ΨL, ρR, E, e, normgrad, numfg, history =
+            groundstate(H, InfiniteCMPS(Q, R);
+                        optalg = optalg, eigalg = eigalg, linalg = linalg)
+        @test E ≈ -0.43306384063961445
+        @test abs(expval(ψ, ΨL, one(ρR), ρR)(0)) < gradtol
+        @test expval(ψ'*ψ, ΨL, one(ρR), ρR)(0) ≈ 0.5086468402292694 atol=gradtol
+    end
+end

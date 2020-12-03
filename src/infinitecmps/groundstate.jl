@@ -91,7 +91,7 @@ function groundstate(H::LocalHamiltonian, Ψ₀::UniformCMPS;
         @show infoL
     end
 
-    x, E, normgrad, numfg, history =
+    x, E, grad, numfg, history =
         optimize(fg, x, optalg; retract = retract,
                                 precondition = precondition,
                                 finalize! = _finalize!,
@@ -99,6 +99,7 @@ function groundstate(H::LocalHamiltonian, Ψ₀::UniformCMPS;
                                 scale! = scale!, add! = add!,
                                 isometrictransport = true)
     (ΨL, ρR, HL, E, e, hL) = x
+    normgrad = sqrt(inner(x, grad, grad))
     return ΨL, ρR, E, e, normgrad, numfg, history
 end
 
@@ -193,7 +194,7 @@ function groundstate(H::LocalHamiltonian, Ψ₀::FourierCMPS;
         return optimtest(fg, x; alpha = -0.1:0.01:0.1, retract = retract, inner = inner)
     end
 
-    x, E, normgrad, numfg, history =
+    x, E, grad, numfg, history =
         optimize(fg, x, optalg; retract = retract,
                                 # precondition = precondition,
                                 # finalize! = _finalize!,
@@ -201,5 +202,6 @@ function groundstate(H::LocalHamiltonian, Ψ₀::FourierCMPS;
                                 scale! = scale!, add! = add!,
                                 isometrictransport = true)
     (ΨL, ρR, HL, E, e, hL) = x
+    normgrad = sqrt(inner(x, grad, grad))
     return ΨL, ρR, E, e, normgrad, numfg, history
 end
