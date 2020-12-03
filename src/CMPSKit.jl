@@ -8,7 +8,7 @@ export leftgauge, rightgauge, leftgauge!, rightgauge!,
         leftcanonical, rightcanonical, leftcanonical!, rightcanonical!
 export InfiniteCMPS, LeftTransfer, RightTransfer
 export Constant, FourierSeries
-export fit, differentiate, integrate, ∂, ∫, localdot, domain, period, nummodes
+export fit, differentiate, integrate, ∂, ∫, localdot, domain, period, nummodes, density
 export leftreducedoperator, rightreducedoperator, expval, gradient, groundstate
 
 export ψ, ∂ψ
