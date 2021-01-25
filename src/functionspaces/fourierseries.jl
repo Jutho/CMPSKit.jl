@@ -1,5 +1,5 @@
 # Type definition
-struct FourierSeries{T,S<:Real} <: FunctionSpace{T}
+struct FourierSeries{T,S<:Real} <: FunctionSeries{T}
     coeffs::Vector{T}
     period::S
     function FourierSeries(coeffs::Vector{T}, period=1) where {T}
@@ -45,8 +45,8 @@ function Base.setindex!(F::FourierSeries, v, k)
 end
 
 # Use as function
-function (F::FourierSeries)(x)
-    xred = x/period(F)
+function (F::FourierSeries)(x̃)
+    xred = x̃/period(F)
     x = mod1(xred, one(xred))
     K = nummodes(F)
     factor = 2pi
@@ -59,7 +59,7 @@ end
 
 # Change number of coefficients
 function truncate!(F::FourierSeries; Kmax::Integer = nummodes(F), tol::Real = 0)
-    Ktol = findlast(x->norm(x)>=tol, F.coeffs)
+    Ktol = findlast(x->(norm(x) >= tol), F.coeffs)
     Kmax = min(Kmax, Ktol === nothing ? 0 : Ktol>>1)
     if Kmax < nummodes(F)
         resize!(F.coeffs, 2*Kmax+1)
@@ -262,10 +262,11 @@ LinearAlgebra.mul!(F::FourierSeries, F1::FourierSeries, F2::FourierSeries,
 
 function truncmul!(Fdst::FourierSeries, α₁::Number, Fsrc::FourierSeries,
                     α₂ = true, β = false;
-                    Kmax::Integer = nummodes(Fsrc), tol::Real = 0)
+                    Kmax::Integer = max(nummodes(Fdst), nummodes(Fsrc)), tol::Real = 0)
     α = α₁ * α₂
     domain(Fdst) == domain(Fsrc) || throw(DomainMismatch())
-    setnummodes!(Fdst, Kmax)
+    K = min(Kmax, iszero(β) ? nummodes(Fsrc) : max(nummodes(Fdst), nummodes(Fsrc)))
+    setnummodes!(Fdst, K)
     if eltype(Fdst) <: Number
         mul!(coefficients(Fdst), α, coefficients(Fsrc))
     else
@@ -277,10 +278,11 @@ function truncmul!(Fdst::FourierSeries, α₁::Number, Fsrc::FourierSeries,
 end
 function truncmul!(Fdst::FourierSeries, Fsrc::FourierSeries, α₁::Number,
                     α₂ = true, β = false;
-                    Kmax::Integer = nummodes(Fsrc), tol::Real = 0)
+                    Kmax::Integer = max(nummodes(Fdst), nummodes(Fsrc)), tol::Real = 0)
     α = α₁ * α₂
     domain(Fdst) == domain(Fsrc) || throw(DomainMismatch())
-    setnummodes!(Fdst, Kmax)
+    K = min(Kmax, iszero(β) ? nummodes(Fsrc) : max(nummodes(Fdst), nummodes(Fsrc)))
+    setnummodes!(Fdst, K)
     if eltype(Fdst) <: Number
         mul!(coefficients(Fdst), coefficients(Fsrc), α)
     else

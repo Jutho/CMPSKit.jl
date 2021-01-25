@@ -1,5 +1,5 @@
 # Type definition
-struct Constant{T} <: FunctionSpace{T}
+struct Constant{T} <: FunctionSeries{T}
     coeffs::Base.RefValue{T}
     Constant(x::T) where T = new{T}(Ref(x))
 end
@@ -123,7 +123,7 @@ function truncmul!(F::Constant, F1::Constant, F2::Constant,
                     α = true, β = false;
                     Kmax::Integer = 0, tol::Real = 0)
 
-    if eltype(F) <: Number || (eltype(F1) <: Number && eltype(F2) <: Number)
+    if eltype(F) <: Number
         F[] = α * F1[] + β * F[2]
     else
         if eltype(F1) <: Number

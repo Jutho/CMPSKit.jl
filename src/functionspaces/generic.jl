@@ -14,14 +14,14 @@ struct DomainMismatch <: Exception end
 Base.show(io::IO, ::DomainMismatch) =
     Base.print(io, "DomainMismatch(): function space arguments have non-matching domain.")
 
-abstract type FunctionSpace{T} end
+abstract type FunctionSeries{T} end
 
-scalartype(::Type{<:FunctionSpace{T}}) where T = scalartype(T)
-Base.eltype(::Type{<:FunctionSpace{T}}) where T = T
+scalartype(::Type{<:FunctionSeries{T}}) where T = scalartype(T)
+Base.eltype(::Type{<:FunctionSeries{T}}) where T = T
 
-
-function LinearAlgebra.isapprox(x::FunctionSpace, y::FunctionSpace;
+function LinearAlgebra.isapprox(x::F, y::F;
                                 atol::Real=0,
-                                rtol::Real=Base.rtoldefault(eltype(x), eltype(y), atol))
+                                rtol::Real=Base.rtoldefault(eltype(x), eltype(y), atol)
+                                ) where {F<:FunctionSeries}
     return norm(x-y) <= max(atol, rtol*max(norm(x), norm(y)))
 end

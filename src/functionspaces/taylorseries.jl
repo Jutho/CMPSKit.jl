@@ -1,311 +1,471 @@
-using LinearAlgebra
-
-mutable struct TaylorSeries{T,S<:Real}
+# Type definition
+mutable struct TaylorSeries{T, S<:Real} <: FunctionSeries{T}
     coeffs::Vector{T}
     offset::S
+    function TaylorSeries(coeffs::Vector{T}, offset = 0.) where {T}
+        @assert length(coeffs) >= 1
+        S = typeof(offset)
+        new{T,S}(coeffs, offset)
+    end
 end
-TaylorSeries(coeffs::Vector{T}) where T = TaylorSeries(coeffs, 0)
 
-Base.length(t::TaylorSeries) = length(t.coeffs)
-degree(t::TaylorSeries) = length(t) - 1
-offset(t::TaylorSeries) = t.offset
+# Basic properties
+offset(f::TaylorSeries) = f.offset
+domain(f::TaylorSeries) = (-Inf,+Inf)
 
-function shift!(t::TaylorSeries{T}, b) where T
-    a = offset(t)
-    a == b && return t
-    for k = 0:degree(t)
-        for l = degree(t):-1:k+1
+degree(f::TaylorSeries) = length(f.coeffs) - 1
+coefficients(f::TaylorSeries) = f.coeffs
+
+function shift!(f::TaylorSeries{T}, b) where T
+    a = offset(f)
+    a == b && return f
+    for k = 0:degree(f)
+        for l = degree(f):-1:k+1
             if T <: AbstractArray
-                axpy!((b-a)^(l-k)*binomial(l,k), t[l], t[k])
+                axpy!((b-a)^(l-k)*binomial(l,k), f[l], f[k])
             else
-                t[k] += t[l]*(b-a)^(l-k)*binomial(l,k)
+                f[k] += f[l]*(b-a)^(l-k)*binomial(l,k)
             end
         end
     end
-    t.offset = b
-    return t
+    f.offset = b
+    return f
 end
-shift(t::TaylorSeries, b) = b == offset(t) ? t : shift!(copy(t), b)
+shift(f::TaylorSeries, b) = b == offset(f) ? t : shift!(copy(f), b)
 
-Base.copy(t::TaylorSeries) = TaylorSeries([copy(t[k]) for k = 0:degree(t)], offset(t))
+function Base.:(==)(f1::TaylorSeries, f2::TaylorSeries)
+    offset(f1) == offset(f2) || return (f1 == shift(f2, offset(f1)))
+    K = max(degree(f1), degree(f1))
+    for k = 0:K
+        f1[k] == f2[k] || return false
+    end
+    return true
+end
 
-function Base.getindex(t::TaylorSeries, k)
-    k < 0 && return BoundsError(t, k)
-    @inbounds if k > degree(t)
-        return zero(t.coeffs[1])
+# Indexing, getting and setting coefficients
+Base.eachindex(f::TaylorSeries) = 0:degree(f)
+function Base.getindex(f::TaylorSeries, k)
+    k < 0 && return BoundsError(f, k)
+    @inbounds if k > degree(f)
+        return zero(f.coeffs[1])
     else
-        return t.coeffs[k+1]
+        return f.coeffs[k+1]
     end
 end
-function Base.setindex!(t::TaylorSeries, v, k)
-    k < 0 && return BoundsError(t, k)
-    @inbounds if k > degree(t)
-        t0 = t[0]
-        while length(t) < k
-            push!(t.coeffs, zero(t0))
+function Base.setindex!(f::TaylorSeries, v, k)
+    k < 0 && return BoundsError(f, k)
+    @inbounds if k > degree(f)
+        f0 = f[0]
+        while length(f) < k
+            push!(f.coeffs, zero(f0))
         end
-        push!(t.coeffs, v)
+        push!(f.coeffs, v)
         return v
     else
-        setindex!(t.coeffs, v, k+1)
+        setindex!(f.coeffs, v, k+1)
         return v
     end
 end
 
-function (t::TaylorSeries)(x::Real)
+# Use as function
+function (f::TaylorSeries)(x::Real)
     k = degree(t)
     xa = x - offset(t)
-    (xa == zero(xa) || k == 0) && return copy(t[0])
-    v = copy(t[k])
+    (xa == zero(xa) || k == 0) && return copy(f[0])
+    v = copy(f[k])
     if v isa AbstractArray
         while k > 0
-            v = LinearAlgebra.axpby!(one(xa), t[k-1], xa, v)
+            v = LinearAlgebra.axpby!(one(xa), f[k-1], xa, v)
             k -= 1
         end
     else
         while k > 0
-            v = muladd(xa, v, t[k-1])
+            v = muladd(xa, v, f[k-1])
             k -= 1
         end
     end
     return v
 end
 
-Base.eltype(t::TaylorSeries) = eltype(typeof(t))
-Base.eltype(::Type{TaylorSeries{<:Real,T}}) where {T} = eltype(T)
-
-function trunc!(t::TaylorSeries; kmax::Integer = length(F)-1, tol::Real = 0)
-    ktol = findlast(x->norm(x)>=tol, t.coeffs) - 1
-    kmax = min(kmax, ktol === nothing ? 0 : ktol)
-    if degree(t) > kmax
-        resize!(t.coeffs, kmax+1)
+# Change number of coefficients
+function truncate!(f::TaylorSeries; Kmax::Integer = degree(f), tol::Real = 0, dx::Real = 1.)
+    ktol = findlast(k->(norm(f[k])*abs(dx)^k >= tol), eachindex(f))
+    Ktol = ktol === nothing ? 0 : ktol-1
+    Kmax = min(Kmax, Ktol)
+    if Kmax < degree(f)
+        resize!(f.coeffs, Kmax + 1)
     end
-    return t
+    return f
 end
 
-function setdegree!(t::TaylorSeries, K::Int)
-    while degree(t) < K
-        push!(t.coeffs, zero(t[0]))
+function setdegree!(f::TaylorSeries, K::Int)
+    while degree(f) < K
+        push!(f.coeffs, zero(f[0]))
     end
-    if degree(t) > K
-        resize!(t.coeffs, K+1)
+    if degree(f) > K
+        resize!(f.coeffs, K+1)
     end
-    return t
+    return f
 end
 
-function Base.copyto!(tdst::TaylorSeries, tsrc::TaylorSeries)
-    @assert offset(tdst) == offset(tsrc)
-    setdegree!(tdst, degree(tsrc))
-    for j = 0:degree(tsrc)
-        tdst[j] = copy(tsrc[j])
+# special purpose constructor
+Base.similar(f::TaylorSeries, ::Type{T} = scalartype(f)) where {T} =
+    TaylorSeries([zero(T)*f[0]], offset(f))
+
+Base.zero(f::TaylorSeries) = TaylorSeries([zero(f[0])], offset(f))
+Base.one(f::TaylorSeries) = TaylorSeries([one(f[0])], offset(f))
+
+# Arithmetic (out of place)
+Base.copy(f::TaylorSeries) = TaylorSeries(copy.(coefficients(f)), offset(f))
+
+Base.:-(f::TaylorSeries) = TaylorSeries(.-coefficients(f), offset(f))
+Base.:+(f::TaylorSeries) = TaylorSeries(.+coefficients(f), offset(f))
+
+const Const = Union{Number,AbstractArray}
+Base.:*(f::TaylorSeries, a::Const) =
+    TaylorSeries([c*a for c in coefficients(f)], offset(f))
+Base.:*(a::Const, f::TaylorSeries) =
+    TaylorSeries([a*c for c in coefficients(f)], offset(f))
+Base.:/(f::TaylorSeries, a::Const) =
+    TaylorSeries([c/a for c in coefficients(f)], offset(f))
+Base.:\(a::Const, f::TaylorSeries) =
+    TaylorSeries([a\c for c in coefficients(f)], offset(f))
+
+
+function Base.:+(f1::TaylorSeries, f2::TaylorSeries)
+    offset(f1) == offset(f2) || return (f1 + shift(f2, offset(f1)))
+    K = min(degree(f1), degree(f2))
+    coeffs = [f1[j]+f2[j] for j = 0:K]
+    for j = K+1:degree(f1)
+        push!(coeffs, copy(f1[j]))
     end
-    return tdst
+    for j = K+1:degree(f2)
+        push!(coeffs, copy(f2[j]))
+    end
+    return TaylorSeries(coeffs, offset(f1))
 end
 
-Base.fill!(t::TaylorSeries{<:Number}, α) = (fill!(t.coeffs, α); return t)
-Base.fill!(t::TaylorSeries{<:AbstractArray}, α) = (map!(x->fill!(x, α), t.coeffs, t.coeffs); return t)
-
-LinearAlgebra.rmul!(t::TaylorSeries, α) = (rmul!(t.coeffs, α); return t)
-LinearAlgebra.lmul!(α, t::TaylorSeries) = (lmul!(α, t.coeffs); return t)
-
-function LinearAlgebra.mul!(tdst::TaylorSeries, α, tsrc::TaylorSeries)
-    @assert offset(tdst) == offset(tsrc)
-    setdegree!(tdst, degree(tsrc))
-    mul!(tdst.coeffs, α, tsrc.coeffs)
-    return tdst
+function Base.:-(f1::TaylorSeries, f2::TaylorSeries)
+    offset(f1) == offset(f2) || return (f1 - shift(f2, offset(f1)))
+    K = min(degree(f1), degree(f2))
+    coeffs = [f1[j]-f2[j] for j = 0:K]
+    for j = K+1:degree(f1)
+        push!(coeffs, copy(f1[j]))
+    end
+    for j = K+1:degree(f2)
+        push!(coeffs, -(f2[j]))
+    end
+    return TaylorSeries(coeffs, offset(f1))
 end
 
-function LinearAlgebra.mul!(tdst::TaylorSeries, tsrc::TaylorSeries, α)
-    @assert offset(tdst) == offset(tsrc)
-    setdegree!(tdst, degree(tsrc))
-    mul!(tdst.coeffs, tsrc.coeffs, α)
-    return tdst
-end
+Base.:*(f1::TaylorSeries, f2::TaylorSeries) = truncmul(f1, f2)
 
-function LinearAlgebra.axpy!(α, tx::TaylorSeries, ty::TaylorSeries)
-    @assert offset(tx) == offset(ty)
-    Kx = degree(tx)
-    setdegree!(ty, max(tx, degree(ty)))
-    Ky = degree(ty)
-    if Ky > Kx
-        LinearAlgebra.axpy!(α, tx.coeffs, view(ty.coeffs, 1:(Kx+1)))
+function truncmul(f1::TaylorSeries, f2::TaylorSeries; kwargs...)
+    if offset(f1) == offset(f2)
+        _truncmul(f1, shift(f2, offset(f1)); kwargs...)
     else
-        LinearAlgebra.axpy!(α, tx.coeffs, ty.coeffs)
+        _truncmul(f1, f2; kwargs...)
     end
-    return ty
 end
-function LinearAlgebra.axpby!(α, tx::TaylorSeries, β, ty::TaylorSeries)
-    @assert offset(tx) == offset(ty)
-    Kx = degree(tx)
-    setdegree!(ty, max(tx, degree(ty)))
-    Ky = degree(ty)
-    if Ky > Kx
-        LinearAlgebra.axpby!(α, tx.coeffs, β, view(ty.coeffs, 1:(Kx+1)))
-        lmul!(β, view(ty.coeffs, (Kx+2):(Ky+1)))
+
+function _truncmul(f1::TaylorSeries, f2::TaylorSeries;
+                    Kmax = degree(f1) + degree(f2), tol::Real = 0, dx = 1)
+    K = min(Kmax, degree(f1) + degree(f2))
+    f = TaylorSeries(sizehint!([zero(f1[0])*zero(f2[0])], K+1), offset(f1))
+    return truncmul!(f, f1, f2, true, true; Kmax = Kmax, tol = tol, dx = dx)
+end
+
+Base.conj(f::TaylorSeries) = TaylorSeries(map(conj, coefficients(f)), offset(f))
+Base.adjoint(f::TaylorSeries) = TaylorSeries(map(adjoint, coefficients(f)), offset(f))
+Base.transpose(f::TaylorSeries) = TaylorSeries(map(transpose, coefficients(f)), offset(f))
+
+LinearAlgebra.tr(f::TaylorSeries) = TaylorSeries(map(tr, coefficients(f)), offset(f))
+
+Base.real(f::TaylorSeries) = TaylorSeries(map(real, coefficients(f)), offset(f))
+Base.imag(f::TaylorSeries) = TaylorSeries(map(imag, coefficients(f)), offset(f))
+
+# Arithmetic (in place / mutating methods)
+function Base.copy!(fdst::TaylorSeries, fsrc::TaylorSeries)
+    fdst.offset = offset(fsrc)
+    setdegree!(fdst, degree(fsrc))
+    for j = 0:degree(fsrc)
+        fdst[j] = copy(fsrc[j])
+    end
+    return fdst
+end
+function LinearAlgebra.rmul!(f::TaylorSeries, α::Number)
+    if eltype(f) <: Number
+        rmul!(coefficients(f), α)
     else
-        LinearAlgebra.axpby!(α, tx.coeffs, β, ty.coeffs)
+        for k in eachindex(f)
+            rmul!(f[k], α)
+        end
     end
-    return ty
+    return f
 end
-
-function LinearAlgebra.axpy!(α, tx::TaylorSeries{<:AbstractArray},
-                                ty::TaylorSeries{<:AbstractArray})
-    @assert offset(tx) == offset(ty)
-    Kx = degree(tx)
-    setdegree!(ty, max(Kx, degree(ty)))
-    for j = 0:Kx
-        LinearAlgebra.axpy!(α, tx[j], ty[j])
-    end
-    return ty
-end
-function LinearAlgebra.axpby!(α, tx::TaylorSeries{<:AbstractArray},
-                                β, ty::TaylorSeries{<:AbstractArray})
-    @assert offset(tx) == offset(ty)
-    Kx = degree(tx)
-    setdegree!(ty, max(Kx, degree(ty)))
-    Ky = degree(ty)
-    for j = 0:Kx
-        LinearAlgebra.axpby!(α, tx[j], β, ty[j])
-    end
-    for j = Kx+1:Ky
-        LinearAlgebra.lmul!(β, ty[j])
-    end
-    return ty
-end
-
-Base.zero(t::TaylorSeries) = TaylorSeries([zero(t[0])], offset(t))
-Base.one(t::TaylorSeries) = TaylorSeries([one(t[0])], offset(t))
-
-function Base.similar(t::TaylorSeries{T}) where T
-    if isbitstype(T)
-        return TaylorSeries(similar(t.coeffs), offset(t))
+function LinearAlgebra.lmul!(α::Number, f::TaylorSeries)
+    if eltype(f) <: Number
+        lmul!(α, coefficients(f))
     else
-        return TaylorSeries(similar.(t.coeffs), offset(t))
+        for k in eachindex(f)
+            lmul!(α, f[k])
+        end
     end
+    return f
 end
+LinearAlgebra.axpy!(α::Number, fx::TaylorSeries, fy::TaylorSeries) =
+    truncadd!(fy, fx, α)
+LinearAlgebra.axpby!(α::Number, fx::TaylorSeries, β::Number, fy::TaylorSeries) =
+    truncadd!(fy, fx, α, β)
+LinearAlgebra.mul!(fy::TaylorSeries, s::Number, fx::TaylorSeries, α = true, β = false) =
+    truncmul!(fy, s, fx, α, β)
+LinearAlgebra.mul!(fy::TaylorSeries, fx::TaylorSeries, s::Number, α = true, β = false) =
+    truncmul!(fy, fx, s, α, β)
+LinearAlgebra.mul!(f::TaylorSeries, f1::TaylorSeries, f2::TaylorSeries,
+                    α = true, β = false) = truncmul!(f, f1, f2, α, β)
 
-function Base.:+(t1::TaylorSeries, t2::TaylorSeries)
-    @assert offset(t1) == offset(t2)
-    K = min(degree(t1), degree(t2))
-    coeffs = [t1[j]+t2[j] for j = 0:K]
-    for j = K+1:degree(t1)
-        push!(coeffs, copy(t1[j]))
-    end
-    for j = K+1:degree(t2)
-        push!(coeffs, copy(t2[j]))
-    end
-    return TaylorSeries(coeffs, offset(t1))
-end
-
-function Base.:-(t1::TaylorSeries, t2::TaylorSeries)
-    @assert offset(t1) == offset(t2)
-    K = min(degree(t1), degree(t2))
-    coeffs = [t1[j]-t2[j] for j = 0:K]
-    for j = K+1:degree(t1)
-        push!(coeffs, copy(t1[j]))
-    end
-    for j = K+1:degree(t2)
-        push!(coeffs, -t2[j])
-    end
-    return TaylorSeries(coeffs, offset(t1))
-end
-
-Base.:-(t::TaylorSeries) = TaylorSeries(-t.coeffs, offset(t))
-
-Base.:*(t::TaylorSeries, a::Number) = TaylorSeries([c*a for c in t.coeffs], offset(t))
-Base.:*(a::Number, t::TaylorSeries) = TaylorSeries([a*c for c in t.coeffs], offset(t))
-Base.:/(t::TaylorSeries, a::Number) = TaylorSeries([c/a for c in t.coeffs], offset(t))
-Base.:\(a::Number, t::TaylorSeries) = TaylorSeries([a\c for c in t.coeffs], offset(t))
-
-Base.conj(t::TaylorSeries) = TaylorSeries(map(conj, t.coeffs), offset(t))
-Base.adjoint(t::TaylorSeries) = TaylorSeries(map(adjoint, t.coeffs), offset(t))
-Base.transpose(t::TaylorSeries) = TaylorSeries(map(transpose, t.coeffs), offset(t))
-
-function Base.:*(t1::TaylorSeries, t2::TaylorSeries; Kmax = degree(t1) + degree(t2))
-    @assert offset(t1) == offset(t2)
-    K = min(Kmax, degree(t1) + degree(t2))
-    coeffs = [zero(t1[0])*zero(t2[0]) for k = 0:K]
-    t = TaylorSeries(coeffs, offset(t1))
-    return mul!(t, t1, t2, true, true)
-end
-
-function LinearAlgebra.mul!(t::TaylorSeries, t1::TaylorSeries, t2::TaylorSeries,
-                                α = true, β = false)
-    @assert offset(t) == offset(t1) == offset(t2)
-    K1 = degree(t1)
-    K2 = degree(t2)
-    K = degree(t)
-    for k = 0:K
-        tk = t[k]
-        if tk isa AbstractArray
-            if β != 1
-                rmul!(tk, β)
+function truncadd!(fy::TaylorSeries, fx::TaylorSeries, α = true, β = true;
+                    Kmax::Integer = max(iszero(β) ? 0 : degree(fy), degree(fx)),
+                    tol::Real = 0, dx = 1.)
+    Kx = degree(fx)
+    Ky = min(Kmax, iszero(β) ? Kx : max(Kx, degree(fy)))
+    setdegree!(fy, Ky)
+    @assert offset(fx) == offset(fy)
+    # if offset(fx) == offset(fy)
+        if eltype(fy) <: Number
+            if Kx > Ky
+                axpby!(α, view(coefficients(fx, 1:Ky+1)), β, coefficients(fy))
+            else
+                axpby!(α, coefficients(fx), β, view(coefficients(fy), 1:Kx+1))
+                lmul!(β, view(coefficients(fy), (Kx+2):(Ky+1)))
             end
-            for k1 = max(0, k-K2):min(k, K1)
-                tk1 = t1[k1]
-                tk2 = t2[k-k1]
-                if tk1 isa AbstractArray && tk2 isa AbstractArray
-                    mul!(tk, tk1, tk2, α, true)
-                elseif tk1 isa AbstractArray
-                    axpy!(tk2*α, tk1, tk)
-                elseif tk2 isa AbstractArray
-                    axpy!(tk1*α, tk2, tk)
+        else
+            for k in 0:Kx
+                axpby!(α, fx[k], β, fy[k])
+            end
+            for k in Kx+1:Ky
+                lmul!(β, fy[k])
+            end
+        end
+    # else
+    #     dx = offset(fy) - offset(fx)
+    #     lmul!(β, fy)
+    #     for k = 0:Kx
+    #         for l = 0:min(k, Ky)
+    #             if eltype(fy) <: Number
+    #                 fy[l] += α*fx[k]*dx^(l-k)*binomial(l,k)
+    #             else
+    #                 axpy!(α*dx^(l-k)*binomial(l,k), fx[k], fy[l])
+    #             end
+    #         end
+    #     end
+    # end
+    return truncate!(fy; tol = tol, dx = dx)
+end
+
+function truncmul!(fdst::TaylorSeries, α₁::Number, fsrc::TaylorSeries,
+                    α₂ = true, β = false;
+                    Kmax::Integer = max(iszero(β) ? 0 : degree(fdst), degree(fsrc)),
+                    tol::Real = 0, dx)
+    truncadd!(fdst, fsrc, α₁ * α₂, β; )
+    α = α₁ * α₂
+    K = min(Kmax, iszero(β) ? degree(fsrc) : max(degree(fdst), degree(fsrc)))
+    setdegree!(fdst, K)
+    @assert offset(fx) == offset(fy)
+    if eltype(fdst) <: Number
+        axpby!(α, view(coefficients(fsrc), 1:K+1), β, coefficients(Fdst))
+    else
+        for k in eachindex(fdst)
+            axpby!(Fdst[k], α, Fsrc[k])
+        end
+    end
+    return Fdst
+end
+
+function truncmul!(Fy::TaylorSeries, Fx::TaylorSeries, α₁::Number,
+                    α₂ = true, β = false; kwargs...)
+    return
+    α = α₁ * α₂
+    domain(Fdst) == domain(Fsrc) || throw(DomainMismatch())
+    K = min(Kmax, iszero(β) ? nummodes(Fsrc) : max(nummodes(Fdst), nummodes(Fsrc)))
+    setnummodes!(Fdst, K)
+    if eltype(Fdst) <: Number
+        mul!(coefficients(Fdst), coefficients(Fsrc), α)
+    else
+        for k in eachindex(Fdst)
+            mul!(Fdst[k], Fsrc[k], α)
+        end
+    end
+    return Fdst
+end
+function truncmul!(F::TaylorSeries, F1::TaylorSeries, F2::TaylorSeries,
+                    α = true, β = false;
+                    Kmax::Integer = max(nummodes(F), nummodes(F1)+nummodes(F2)), tol::Real = 0)
+    domain(F) == domain(F1) == domain(F2) || throw(DomainMismatch())
+    K1 = nummodes(F1)
+    K2 = nummodes(F2)
+    K = min(Kmax, max(iszero(β) ? 0 : nummodes(F), K1+K2))
+    setnummodes!(F, K)
+    Threads.@threads for k = -K:K
+        fk = F[k]
+        if fk isa AbstractArray
+            T = eltype(fk)
+            if β == 0
+                fill!(fk, T(β))
+            elseif β != 1
+                rmul!(fk, T(β))
+            end
+            for k1 = max(-K1, k-K2):min(K1, k+K2)
+                k2 = k - k1
+                fk1 = F1[k1]
+                fk2 = F2[k2]
+                if fk1 isa AbstractArray && fk2 isa AbstractArray
+                    mul!(fk, fk1, fk2, T(α), T(true))
+                elseif fk1 isa AbstractArray
+                    axpy!(T(fk2*α), fk1, fk)
+                elseif fk2 isa AbstractArray
+                    axpy!(T(fk1*α), fk2, fk)
                 else
-                    t[k] += tk1*tk2*α
+                    @warn "unexpected branch"
+                    fk .= fk + (fk1*fk2*α)
                 end
             end
         else
-            tk *= β
-            for k1 = max(0, k-K2):min(k, K1)
-                tk += t1[k1]*t2[k-k1]*α
+            fk *= β
+            for k1 = max(-K1, k-K2):min(K1, k+K2)
+                k2 = k - k1
+                fk1 = F1[k1]
+                fk2 = F2[k2]
+                fk += fk1*fk2*α
             end
-            t[k] = tk
+            F[k] = fk
         end
     end
-    return t
+    if tol != 0
+        truncate!(F; tol = tol)
+    end
+    return F
 end
 
-function differentiate(t::TaylorSeries)
-    if degree(t) >= 1
-        return TaylorSeries([k*t[k] for k = 1:degree(t)], offset(t))
+# Inner product and norm
+function localdot(f1::TaylorSeries, f2::TaylorSeries)
+    offset(f1) == offset(f2) || localdot(f1, shift(f2, offset(f1)))
+    K1 = degree(f1)
+    K2 = degree(f2)
+    coeffs = let K = K1 + K2
+        [sum(dot(f1[k1], f2[k-k1]) for k1 = max(0, k-K2):min(k, K1)) for k=0:K]
+    end
+    return TaylorSeries(coeffs, offset(f1))
+end
+
+function differentiate(f::TaylorSeries)
+    if degree(f) >= 1
+        return TaylorSeries([k*f[k] for k = 1:degree(f)], offset(f))
     else
-        return zero(t)
+        return zero(f)
     end
 end
-function integrate(t::TaylorSeries, (a,b)::Tuple{Real,Real})
+function integrate(f::TaylorSeries, (a,b)::Tuple{Real,Real})
     s = t[0]*(b-a)
-    c = offset(t)
-    for k = 1:degree(t)
-        s += t[k]*((b-c)^(k+1) - (a-c)^(k+1))/(k+1)
+    c = offset(f)
+    db = b - c
+    da = a - c
+    for k = 1:degree(f)
+        s += f[k]*(db^(k+1) - da^(k+1))/(k+1)
     end
     return s
 end
 
-function localdot(t1::TaylorSeries, t2::TaylorSeries)
-    @assert offset(t1) == offset(t2)
-    K1 = degree(t1)
-    K2 = degree(t2)
-    coeffs = let K = K1 + K2
-        [sum(dot(t1[k1],t2[k-k1]) for k1 = max(0,k-K2):min(k,K1)) for k=0:K]
-    end
-    return TaylorSeries(coeffs, offset(t1))
-end
+# Simple Fourier transform: typically not needed for large number of points, but should
+# work with matrix valued functions etc
+fit(f, ::Type{TaylorSeries}, (a,b)::Tuple{Real,Real}; kwargs...) =
+    fit(f, TaylorSeries, b-a; kwargs...)
 
-LinearAlgebra.tr(t::TaylorSeries) = TaylorSeries(map(tr, t.coeffs), offset(t))
-
-Base.real(t::TaylorSeries) = TaylorSeries(map(real, t.coeffs), offset(t))
-Base.imag(t::TaylorSeries) = TaylorSeries(map(imag, t.coeffs), offset(t))
-
-function Base.inv(t::TaylorSeries; tol = 1e-10, Kmax = 10*degree(t))
-    t0inv = inv(t[0])
-    coeffs = [t0inv]
-    K = degree(t)
+function fit(f, ::Type{TaylorSeries}, period = 1; Kmax = 10, tol = 1e-12)
+    K = Kmax
+    x = (0:2*K) * (period / (2K+1))
+    fx = map(f, x)
+    ω = 2*pi*0/period
+    integrand = exp.((-im*ω) .* x) .* fx
+    F = TaylorSeries([sum(integrand)/(2K+1)], period)
+    isrealf = all(isreal, fx)
     for k = 1:Kmax
-        invtk = -t0inv*sum(coeffs[i+1]*t[k-i] for i = max(0,k-K):(k-1))
-        if norm(invtk) < tol && norm(coeffs[end]) < tol
-            break
+        ω = 2*pi*k/period
+        integrand .= exp.((-im*ω) .* x) .* fx
+        F[k] = sum(integrand)/(2K+1)
+        if isrealf
+            F[-k] = conj(F[k])
+        else
+            integrand .= exp.((+im*ω) .* x) .* fx
+            F[-k] = sum(integrand)/(2K+1)
         end
-        push!(coeffs, invtk)
     end
-    return TaylorSeries(coeffs, offset(t))
+    return F
 end
+
+# function Base.inv(F::TaylorSeries; tol=1e-12, Kmax = 2*nummodes(F))
+#     K = nummodes(F)
+#     while true
+#         Fx = map(F, (0:2*K)/(2*K+1))
+#         Gx = map(inv, Fx)
+#         krange = vcat([0],[(-1)^iseven(l)*((l+1)>>1) for l=1:2*K])
+#         factor = -im*2*pi/(2*K+1)
+#         coeffG = let factor=factor, Gx=Gx, K = K
+#             map(krange) do k
+#                 sum(exp(factor*k*(l-1))*Gx[l] for l = 1:(2*K+1))/(2*K+1)
+#             end
+#         end
+#         G = TaylorSeries(coeffG)
+#         if norm(G*F-one(G))<tol || K == Kmax
+#             return G
+#         else
+#             K = min(2*K, Kmax)
+#         end
+#     end
+# end
+#
+# function inv2(F::TaylorSeries; tol = 1e-12, Kmax = 2*nummodes(F))
+#     Fi = inv(F; tol = tol, Kmax = Kmax)
+#     Fi2 = linsolve(x->setnummodes!(x*F, nummodes(x)), one(F), Fi; tol = tol)
+#
+#     K = nummodes(F)
+#     while true
+#         Fx = map(F, (0:2*K)/(2*K+1))
+#         Gx = map(inv, Fx)
+#         krange = vcat([0],[(-1)^iseven(l)*((l+1)>>1) for l=1:2*K])
+#         factor = -im*2*pi/(2*K+1)
+#         coeffG = let factor=factor, Gx=Gx, K = K
+#             map(krange) do k
+#                 sum(exp(factor*k*(l-1))*Gx[l] for l = 1:(2*K+1))/(2*K+1)
+#             end
+#         end
+#         G = TaylorSeries(coeffG)
+#         if norm(G*F-one(G))<tol || K == Kmax
+#             return G
+#         else
+#             K = min(2*K, Kmax)
+#         end
+#     end
+#     return Fi2
+# end
+#
+# function Base.sqrt(F::TaylorSeries; tol=1e-12, Kmax = 200)
+#     K = nummodes(F)
+#     while true
+#         Fx = map(F, (0:2*K)/(2*K+1))
+#         Gx = map(sqrt, Fx)
+#         krange = vcat([0],[(-1)^iseven(l)*((l+1)>>1) for l=1:2*K])
+#         factor = -im*2*pi/(2*K+1)
+#         coeffG = let factor=factor, Gx=Gx
+#             map(krange) do k
+#                 sum(exp(factor*k*(l-1))*Gx[l] for l = 1:(2*K+1))/(2*K+1)
+#             end
+#         end
+#         G = TaylorSeries(coeffG)
+#         if norm(G*G-F)<tol || K == Kmax
+#             return G
+#         else
+#             K = min(2*K, Kmax)
+#         end
+#     end
+# end

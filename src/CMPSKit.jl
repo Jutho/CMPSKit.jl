@@ -8,10 +8,10 @@ export leftgauge, rightgauge, leftgauge!, rightgauge!,
         leftcanonical, rightcanonical, leftcanonical!, rightcanonical!
 export InfiniteCMPS, LeftTransfer, RightTransfer
 export Constant, FourierSeries
-export fit, differentiate, integrate, ∂, ∫, localdot, domain, period, nummodes, density
+export fit, differentiate, integrate, localdot, domain, period, nummodes, density
 export leftreducedoperator, rightreducedoperator, expval, gradient, groundstate
 
-export ψ, ∂ψ
+export ψ, ∂ψ, ∂, ∫
 
 using LinearAlgebra
 using KrylovKit
@@ -20,7 +20,7 @@ using OptimKit
 
 scalartype(x::Any) = scalartype(typeof(x))
 scalartype(T::Type{<:Number}) = T
-scalartype(::Type{<:AbstractMatrix{T}}) where T = T
+scalartype(::Type{<:AbstractArray{T}}) where T = T
 
 isscalar(x) = false
 isscalar(x::Number) = true
@@ -47,6 +47,5 @@ include("infinitecmps/environments.jl")
 include("infinitecmps/gauging.jl")
 include("infinitecmps/gradients.jl")
 include("infinitecmps/groundstate.jl")
-
 
 end

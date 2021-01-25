@@ -139,3 +139,57 @@ end
     @test gradR ≈ -differentiate(ρL*𝒟R*ρR) + QL'*ρL*𝒟R*ρR - ρL*𝒟R*ρR*QL' +
                     α*ρL*RL*ρR + β*RL'*ρL*ρR + β*ρL*ρR*RL' + γ*RL'*ρL*RL*RL*ρR + γ*ρL*RL*RL*ρR*RL' + HL*RL*ρR + ρL*RL*HR
 end
+
+@testset "PeriodicCMS: test ground state algorithm" begin
+    D = 2
+    T = ComplexF64
+    α = fit(x->-1 + 0.8*sin(x), FourierSeries; Kmax = 1)
+    β = 0.
+    γ = 1.
+    H = ∫(∂ψ'*∂ψ + α*ψ'*ψ + β*(ψ*ψ + ψ'*ψ') + γ*(ψ')^2*ψ^2, (-Inf,+Inf))
+    Kmax = 10
+
+    A = FourierSeries([exp(-4*(j>>1))*randn(T, (D,D)) for j=1:5])
+    A = (A - A')/2
+    R = FourierSeries([exp(-4*(j>>1))*randn(T, (D,D)) for j=1:3])
+    Q = A - 1/2 * R'*R
+    Ψ = InfiniteCMPS(Q, R)
+
+    eigalg = Arnoldi(; krylovdim = D^2*(2*Kmax+1), tol = 1e-10)
+    ρL, ρR = environments!(Ψ; eigalg = eigalg, Kmax = Kmax)
+
+    linalg = GMRES(; krylovdim = D^2*(2*Kmax+1), tol = 1e-10, maxiter = 1)
+
+    HL, = leftenv(H, (Ψ, ρL, ρR); linalg = linalg, Kmax = Kmax)
+    HR, = rightenv(H, (Ψ, ρL, ρR); linalg = linalg, Kmax = Kmax)
+
+
+    optalg = ConjugateGradient(; gradtol = 1e-7, verbosity = 2)
+
+    ΨL, ρR, E, e, normgrad, numfg, history =
+        groundstate(H, Ψ;
+                    optalg = optalg, eigalg = eigalg, linalg = linalg, Kmax = Kmax)
+
+    ΨL, ρR, E, e, normgrad, numfg, history =
+        groundstate(H, ΨL;
+                    optalg = optalg, eigalg = eigalg, linalg = linalg, Kmax = Kmax)
+
+
+
+    gradtol = 1e-7
+    optalg = ConjugateGradient(; gradtol = gradtol)
+    eigalg = Arnoldi(; krylovdim = 16, tol = 1e-10)
+    linalg = GMRES(; krylovdim = 16, tol = 1e-10)
+    for k = 1:3
+        Q = Constant(randn(T, (D,D)))
+        R = Constant(randn(T, (D,D)))
+
+        ΨL, ρR, E, e, normgrad, numfg, history =
+            groundstate(H, InfiniteCMPS(Q, R);
+                        optalg = optalg, eigalg = eigalg, linalg = linalg)
+        @test E ≈ -0.43306384063961445
+        @test abs(expval(ψ, ΨL, one(ρR), ρR)(0)) < gradtol
+        @test expval(ψ'*ψ, ΨL, one(ρR), ρR)(0) ≈ 0.5086468402292694 atol=gradtol
+    end
+end
+linalg = GMRES(; krylovdim = 16, tol = 1e-10)
