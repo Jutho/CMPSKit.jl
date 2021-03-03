@@ -1,3 +1,4 @@
+# Type definition
 struct PiecewiseLinear{T, S<:AbstractVector{<:Real}} <: AbstractPiecewise{TaylorSeries{T}}
     nodes::S
     values::Vector{T}
@@ -11,11 +12,14 @@ struct PiecewiseLinear{T, S<:AbstractVector{<:Real}} <: AbstractPiecewise{Taylor
     end
 end
 
+# Basic properties
 nodes(p::PiecewiseLinear) = p.nodes
 elements(p::PiecewiseLinear) = Base.Generator(i->p[i], Base.OneTo(length(p)))
 nodevalues(p::PiecewiseLinear) = p.values
 
 Base.length(p::PiecewiseLinear) = length(p.values) - 1
+
+# Indexing, getting (and setting) coefficients
 function Base.getindex(p::PiecewiseLinear, i)
     1 <= i <= length(p) || throw(BoundsError(p, i))
     v0 = p.values[i]
@@ -27,6 +31,7 @@ function Base.getindex(p::PiecewiseLinear, i)
     return TaylorSeries([(v0+v1)/2, (v1-v0)/dx], xmid)
 end
 
+# Use as function
 function (P::PiecewiseLinear)(x)
     nodes = P.nodes
     values = P.values
@@ -48,16 +53,18 @@ function (P::PiecewiseLinear)(x)
     end
 end
 
-for f in (:copy, :zero, :one, :conj, :transpose, :adjoint, :real, :imag, :-)
-    @eval Base.$f(p::PiecewiseLinear) = PiecewiseLinear(nodes(p), map($f, nodevalues(p)))
-end
-
+# Special purpose constructor
 function Base.similar(p::PiecewiseLinear{T}) where T
     if isbitstype(T)
         return PiecewiseLinear(nodes(p), similar(nodevalues(p)))
     else
         return PiecewiseLinear(nodes(p), map(similar, nodevalues(p)))
     end
+end
+
+# Arithmetic (out of place)
+for f in (:copy, :zero, :one, :conj, :transpose, :adjoint, :real, :imag, :-, :+)
+    @eval Base.$f(p::PiecewiseLinear) = PiecewiseLinear(nodes(p), map($f, nodevalues(p)))
 end
 
 function Base.:+(p1::PiecewiseLinear, p2::PiecewiseLinear)
@@ -70,6 +77,7 @@ function Base.:-(p1::PiecewiseLinear, p2::PiecewiseLinear)
     return PiecewiseLinear(nodes(p1), nodevalues(p1) .- nodevalues(p2))
 end
 
+# Arithmetic (in place / mutating methods)
 function LinearAlgebra.rmul!(p::PiecewiseLinear, α)
     rmul!(p.values, α)
     return p

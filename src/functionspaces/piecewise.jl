@@ -1,17 +1,3 @@
-abstract type AbstractPiecewise{T} end
-
-domain(p::AbstractPiecewise) = (first(nodes(p)), last(nodes(p)))
-function domain(p::AbstractPiecewise, i)
-    1 <= i <= length(p) || throw(BoundsError(p, i))
-    n = nodes(p)
-    @inbounds begin
-        return (n[i], n[i+1])
-    end
-end
-
-Base.eltype(t::AbstractPiecewise{T}) where {T} = eltype(T)
-Base.eltype(::Type{<:AbstractPiecewise{T}}) where {T} = eltype(T)
-
 # Generic implementation: arbitrary list of elements on the intervals between the nodes
 struct Piecewise{T,S<:AbstractVector{<:Real}} <: AbstractPiecewise{T}
     nodes::S
@@ -28,15 +14,18 @@ struct Piecewise{T,S<:AbstractVector{<:Real}} <: AbstractPiecewise{T}
     end
 end
 
+# Basic properties
 nodes(p::Piecewise) = p.nodes
 elements(p::Piecewise) = p.elements
 nodevalues(p::Piecewise) = Base.Generator(p, nodes(p))
 
 Base.length(p::Piecewise) = length(p.elements)
 
+# Indexing, getting and setting elements
 @inline Base.getindex(p::Piecewise, i) = getindex(p.elements, i)
 @inline Base.setindex!(p::Piecewise, v, i) = setindex!(p.elements, v, i)
 
+# Use as function
 function (p::Piecewise)(x)
     x₀ = first(nodes(p))
     x₁ = last(nodes(p))
@@ -54,10 +43,54 @@ function (p::Piecewise)(x)
     end
 end
 
-Base.copy(p::Piecewise) = Piecewise(copy(nodes(p)), map(copy, elements(p)))
+# Change number of coefficients
+function truncate!(p::Piecewise; kwargs...)
+    for i = 1:length(p)
+        truncate!(p[i], kwargs...)
+    end
+    return p
+end
 
+# Special purpose constructor
 Base.similar(p::Piecewise) = Piecewise(nodes(p), map(similar, elements(p)))
+Base.zero(p::Piecewise) = Piecewise(nodes(p), map(zero, elements(p)))
+Base.one(p::Piecewise) = Piecewise(nodes(p), map(one, elements(p)))
 
+# Arithmetic (out of place)
+Base.copy(p::AbstractPiecewise) = Piecewise(copy(nodes(p)), map(copy, elements(p)))
+
+Base.:+(p::AbstractPiecewise) = Piecewise(nodes(p), map(+, elements(p)))
+Base.:-(p::AbstractPiecewise) = Piecewise(nodes(p), map(-, elements(p)))
+
+function Base.:+(p1::AbstractPiecewise, p2::AbstractPiecewise)
+    @assert nodes(p1) == nodes(p2)
+    return Piecewise(nodes(p1), [p1[i] + p2[i] for i = 1:length(p1)])
+end
+
+function Base.:-(p1::AbstractPiecewise, p2::AbstractPiecewise)
+    @assert nodes(p1) == nodes(p2)
+    return Piecewise(nodes(p1), [p1[i] - p2[i] for i = 1:length(p1)])
+end
+
+Base.:*(p::AbstractPiecewise, a::Const) = Piecewise(nodes(p), map(x->x*a, elements(p)))
+Base.:*(a::Const, p::AbstractPiecewise) = Piecewise(nodes(p), map(x->a*x, elements(p)))
+Base.:/(p::AbstractPiecewise, a) = Piecewise(nodes(p), map(x->x/a, elements(p)))
+Base.:\(a, p::AbstractPiecewise) = Piecewise(nodes(p), map(x->a\x, elements(p)))
+
+Base.:*(p1::AbstractPiecewise, p2::AbstractPiecewise) = truncmul(p1, p2)
+function truncmul(p1::AbstractPiecewise, p2::AbstractPiecewise; kwargs...)
+    n = nodes(p1)
+    @assert n == nodes(p2)
+    return Piecewise(n, [truncmul(p1[i], p2[i]; kwargs..., dx = n[i+1]-n[i]) for i = 1:length(p1)])
+end
+
+for f in (:conj, :adjoint, :transpose, :real, :imag)
+    @eval Base.$f(p::AbstractPiecewise) = Piecewise(nodes(p), map($f, elements(p)))
+end
+
+LinearAlgebra.tr(p::AbstractPiecewise) = Piecewise(nodes(p), map(tr, elements(p)))
+
+# Arithmetic (in place / mutating methods)
 function LinearAlgebra.rmul!(p::Piecewise, α)
     for i = 1:length(p)
         rmul!(p[i], α)
@@ -103,35 +136,6 @@ function LinearAlgebra.axpby!(α, px::Piecewise, β, py::Piecewise)
     return py
 end
 
-Base.zero(p::Piecewise) = Piecewise(nodes(p), zero.(p.elements))
-Base.one(p::Piecewise) = Piecewise(nodes(p), one.(p.elements))
-
-function Base.:+(p1::AbstractPiecewise, p2::AbstractPiecewise)
-    @assert nodes(p1) == nodes(p2)
-    return Piecewise(nodes(p1), [p1[i] + p2[i] for i = 1:length(p1)])
-end
-
-function Base.:-(p1::AbstractPiecewise, p2::AbstractPiecewise)
-    @assert nodes(p1) == nodes(p2)
-    return Piecewise(nodes(p1), [p1[i] - p2[i] for i = 1:length(p1)])
-end
-
-Base.:-(p::AbstractPiecewise) = Piecewise(nodes(p), map(-, elements(p)))
-
-Base.:*(p::AbstractPiecewise, a) = mul!(similar(p), p, a)
-Base.:*(a, p::AbstractPiecewise) = mul!(similar(p), a, p)
-Base.:/(p::AbstractPiecewise, a) = mul!(similar(p), p, inv(a))
-Base.:\(a, p::AbstractPiecewise) = mul!(similar(p), inv(a), p)
-
-for f in (:conj, :adjoint, :transpose, :real, :imag)
-    @eval Base.$f(p::AbstractPiecewise) = Piecewise(nodes(p), map($f, elements(p)))
-end
-
-function Base.:*(p1::AbstractPiecewise, p2::AbstractPiecewise; kwargs...)
-    @assert nodes(p1) == nodes(p2)
-    return Piecewise(nodes(p1), [*(p1[i], p2[i]; kwargs...) for i = 1:length(p1)])
-end
-
 function LinearAlgebra.mul!(p::Piecewise, p1::AbstractPiecewise, p2::AbstractPiecewise,
                                 α = true, β = false)
     @assert nodes(p) == nodes(p1) == nodes(p2)
@@ -141,6 +145,17 @@ function LinearAlgebra.mul!(p::Piecewise, p1::AbstractPiecewise, p2::AbstractPie
     return p
 end
 
+# Inner product and norm
+function localdot(p1::AbstractPiecewise, p2::AbstractPiecewise)
+    @assert nodes(p1) == nodes(p2)
+    return Piecewise(nodes(p1), map(localdot, elements(p1), elements(p2)))
+end
+
+LinearAlgebra.dot(p1::AbstractPiecewise, p2::AbstractPiecewise) = integrate(localdot(p1, p2), domain(p1))
+
+LinearAlgebra.norm(p::AbstractPiecewise) = sqrt(dot(p, p))
+
+# Differentiate and integrate
 differentiate(p::AbstractPiecewise) = Piecewise(nodes(p), map(differentiate, elements(p)))
 function integrate(p::AbstractPiecewise, interval = domain(p))
     @assert interval == domain(p)
@@ -150,10 +165,3 @@ function integrate(p::AbstractPiecewise, interval = domain(p))
     end
     return s
 end
-
-function localdot(p1::AbstractPiecewise, p2::AbstractPiecewise)
-    @assert nodes(p1) == nodes(p2)
-    return Piecewise(nodes(p1), [localdot(p1[i], p2[i]) for i = 1:length(p1)])
-end
-
-LinearAlgebra.tr(p::AbstractPiecewise) = Piecewise(nodes(p), map(tr, elements(p)))

@@ -7,7 +7,7 @@ export leftenv, rightenv, leftenv!, rightenv!, environments!
 export leftgauge, rightgauge, leftgauge!, rightgauge!,
         leftcanonical, rightcanonical, leftcanonical!, rightcanonical!
 export InfiniteCMPS, LeftTransfer, RightTransfer
-export Constant, FourierSeries
+export Constant, FourierSeries, TaylorSeries
 export fit, differentiate, integrate, localdot, domain, period, nummodes, density
 export leftreducedoperator, rightreducedoperator, expval, gradient, groundstate
 
@@ -28,9 +28,12 @@ isscalar(x::Number) = true
 include("common/regularisedinverse.jl")
 include("common/adjoint.jl")
 
-include("functionspaces/functionspace.jl")
-include("functionspaces/fourierseries.jl")
+include("functionspaces/generic.jl")
 include("functionspaces/constant.jl")
+include("functionspaces/fourierseries.jl")
+include("functionspaces/taylorseries.jl")
+include("functionspaces/piecewise.jl")
+include("functionspaces/piecewiselinear.jl")
 
 const MatrixFunction{T} = FunctionSpace{<:AbstractMatrix{T}}
 const ScalarFunction = Union{<:Number, FunctionSpace{<:Number}}

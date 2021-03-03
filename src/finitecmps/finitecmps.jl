@@ -1,4 +1,4 @@
-mutable struct FiniteCMPS{T<:MatrixFunction, N, V<:AbstractVector}
+mutable struct FiniteCMPS{T<:MatrixFunction, N, V<:AbstractVector} <: AbstractCMPS{T,N}
     Q::T
     Rs::NTuple{N,T}
     vL::V
