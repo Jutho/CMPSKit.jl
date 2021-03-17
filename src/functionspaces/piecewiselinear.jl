@@ -1,5 +1,5 @@
 # Type definition
-struct PiecewiseLinear{T, S<:AbstractVector{<:Real}} <: AbstractPiecewise{TaylorSeries{T}}
+struct PiecewiseLinear{T, S<:AbstractVector{<:Real}} <: AbstractPiecewise{T,TaylorSeries{T}}
     nodes::S
     values::Vector{T}
     function PiecewiseLinear(nodes::S, values::Vector{T}) where {S<:AbstractVector,T}
@@ -75,6 +75,14 @@ end
 function Base.:-(p1::PiecewiseLinear, p2::PiecewiseLinear)
     @assert nodes(p1) == nodes(p2)
     return PiecewiseLinear(nodes(p1), nodevalues(p1) .- nodevalues(p2))
+end
+
+function Base.:*(α::Const, p::PiecewiseLinear)
+    return PiecewiseLinear(nodes(p), (α,) .* nodevalues(p))
+end
+
+function Base.:*(p::PiecewiseLinear, α::Const)
+    return PiecewiseLinear(nodes(p), nodevalues(p) .* (α,))
 end
 
 # Arithmetic (in place / mutating methods)

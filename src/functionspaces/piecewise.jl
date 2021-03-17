@@ -1,8 +1,8 @@
 # Generic implementation: arbitrary list of elements on the intervals between the nodes
-struct Piecewise{T,S<:AbstractVector{<:Real}} <: AbstractPiecewise{T}
+struct Piecewise{T,F<:FunctionSpace{T},S<:AbstractVector{<:Real}} <: AbstractPiecewise{T,F}
     nodes::S
-    elements::Vector{T}
-    function Piecewise(nodes::S, elements::Vector{T}) where {S<:AbstractVector,T}
+    elements::Vector{F}
+    function Piecewise(nodes::S, elements::Vector{F}) where {T, F<:FunctionSpace{T}, S<:AbstractVector}
         @assert length(nodes) == length(elements) + 1
         @assert eltype(nodes) <: Real
         if nodes isa AbstractRange
@@ -10,7 +10,7 @@ struct Piecewise{T,S<:AbstractVector{<:Real}} <: AbstractPiecewise{T}
         else
             @assert issorted(nodes)
         end
-        return new{T, S}(nodes, elements)
+        return new{T, F, S}(nodes, elements)
     end
 end
 
@@ -46,7 +46,7 @@ end
 # Change number of coefficients
 function truncate!(p::Piecewise; kwargs...)
     for i = 1:length(p)
-        truncate!(p[i], kwargs...)
+        truncate!(p[i]; kwargs..., dx = (p.nodes[i+1]-p.nodes[i])/2)
     end
     return p
 end

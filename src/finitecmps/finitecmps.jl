@@ -18,6 +18,6 @@ mutable struct FiniteCMPS{T<:MatrixFunction, N, V<:AbstractVector} <: AbstractCM
 end
 FiniteCMPS(Q::T, R::T, vL::V, vR::V) where {T,V} = FiniteCMPS(Q, (R,), vL, vR)
 
-domain(Ψ::FiniteCMPS) = domain(ψ.Q)
+domain(Ψ::FiniteCMPS) = domain(Ψ.Q)
 
-Base.iterate(Ψ::CMPS, args...) = iterate((Ψ.Q, Ψ.Rs, Ψ.vL, Ψ.vR), args...)
+Base.iterate(Ψ::FiniteCMPS, args...) = iterate((Ψ.Q, Ψ.Rs, Ψ.vL, Ψ.vR), args...)

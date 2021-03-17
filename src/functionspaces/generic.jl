@@ -33,7 +33,7 @@ function LinearAlgebra.isapprox(x::F, y::F;
 end
 
 # AbstractPiecewise
-abstract type AbstractPiecewise{T} <: FunctionSpace{T} end
+abstract type AbstractPiecewise{T,F<:FunctionSpace{T}} <: FunctionSpace{T} end
 
 domain(p::AbstractPiecewise) = (first(nodes(p)), last(nodes(p)))
 function domain(p::AbstractPiecewise, i)

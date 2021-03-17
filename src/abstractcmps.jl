@@ -1,5 +1,7 @@
 abstract type AbstractCMPS{T,N} end
 
+scalartype(ψ::AbstractCMPS{T}) where T = scalartype(T)
+
 function leftreducedoperator(op::FieldOperator, Ψ::AbstractCMPS, ρL = nothing; kwargs...)
     if isnothing(ρL)
         ρL = leftenv(Ψ; kwargs...)
@@ -37,7 +39,7 @@ function leftreducedoperator(ops::LocalOperator, Ψ::AbstractCMPS, ρL = nothing
         if coeff isa Number
             axpy!(coeff, leftreducedoperator(op, Ψ, ρL), hL)
         else
-            hL += coeff * leftreducedoperator(op, Ψ, ρL)
+            mul!(hL, coeff, leftreducedoperator(op, Ψ, ρL), true, true)
         end
     end
     return hL
@@ -52,7 +54,7 @@ function rightreducedoperator(ops::LocalOperator, Ψ::AbstractCMPS, ρR = nothin
         if coeff isa Number
             axpy!(coeff, rightreducedoperator(op, Ψ, ρR), hR)
         else
-            hR += coeff * rightreducedoperator(op, Ψ, ρR)
+            mul!(hR, coeff, rightreducedoperator(op, Ψ, ρR), true, true)
         end
     end
     return hR

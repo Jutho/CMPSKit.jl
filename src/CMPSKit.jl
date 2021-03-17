@@ -6,8 +6,8 @@ export virtualdim
 export leftenv, rightenv, leftenv!, rightenv!, environments!
 export leftgauge, rightgauge, leftgauge!, rightgauge!,
         leftcanonical, rightcanonical, leftcanonical!, rightcanonical!
-export InfiniteCMPS, LeftTransfer, RightTransfer
-export Constant, FourierSeries, TaylorSeries
+export InfiniteCMPS, FiniteCMPS, LeftTransfer, RightTransfer
+export Constant, FourierSeries, TaylorSeries, PiecewiseLinear
 export fit, differentiate, integrate, localdot, domain, period, nummodes, density
 export leftreducedoperator, rightreducedoperator, expval, gradient, groundstate
 
@@ -43,6 +43,10 @@ include("operators/sumofterms.jl")
 include("operators/hamiltonians.jl")
 
 include("abstractcmps.jl")
+
+include("finitecmps/finitecmps.jl")
+include("finitecmps/transfer.jl")
+include("finitecmps/environments.jl")
 
 include("infinitecmps/infinitecmps.jl")
 include("infinitecmps/transfer.jl")

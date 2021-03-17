@@ -56,7 +56,7 @@ function Base.setindex!(f::TaylorSeries, v, k)
     k < 0 && return BoundsError(f, k)
     @inbounds if k > degree(f)
         f0 = f[0]
-        while length(f) < k
+        while degree(f) < k-1
             push!(f.coeffs, zero(f0))
         end
         push!(f.coeffs, v)
@@ -340,7 +340,7 @@ function differentiate(f::TaylorSeries)
     end
 end
 function integrate(f::TaylorSeries, (a,b)::Tuple{Real,Real})
-    s = t[0]*(b-a)
+    s = f[0]*(b-a)
     c = offset(f)
     db = b - c
     da = a - c
