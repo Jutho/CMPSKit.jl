@@ -52,7 +52,8 @@ function truncate!(p::Piecewise; kwargs...)
 end
 
 # Special purpose constructor
-Base.similar(p::Piecewise) = Piecewise(nodes(p), map(similar, elements(p)))
+Base.similar(p::Piecewise, args...) =
+    Piecewise(nodes(p), map(x->similar(x, args...), elements(p)))
 Base.zero(p::Piecewise) = Piecewise(nodes(p), map(zero, elements(p)))
 Base.one(p::Piecewise) = Piecewise(nodes(p), map(one, elements(p)))
 
@@ -105,7 +106,7 @@ function LinearAlgebra.lmul!(α, p::Piecewise)
     return p
 end
 
-function LinearAlgebra.mul!(pdst::Piecewise, α, psrc::Piecewise)
+function LinearAlgebra.mul!(pdst::Piecewise, α::Const, psrc::Piecewise)
     @assert nodes(pdst) == nodes(psrc)
     for i = 1:length(psrc)
         mul!(pdst[i], α, psrc[i])
@@ -113,7 +114,7 @@ function LinearAlgebra.mul!(pdst::Piecewise, α, psrc::Piecewise)
     return pdst
 end
 
-function LinearAlgebra.mul!(pdst::Piecewise, psrc::Piecewise, α)
+function LinearAlgebra.mul!(pdst::Piecewise, psrc::Piecewise, α::Const)
     @assert nodes(pdst) == nodes(psrc)
     for i = 1:length(psrc)
         mul!(pdst[i], psrc[i], α)
@@ -136,10 +137,20 @@ function LinearAlgebra.axpby!(α, px::Piecewise, β, py::Piecewise)
     return py
 end
 
+function truncmul!(p::Piecewise, p1::AbstractPiecewise, p2::AbstractPiecewise,
+                                α = true, β = false; kwargs...)
+    @assert nodes(p) == nodes(p1) == nodes(p2)
+    n = nodes(p)
+    @inbounds for i = 1:length(p)
+        truncmul!(p[i], p1[i], p2[i], α, β; kwargs..., dx = n[i+1]-n[i])
+    end
+    return p
+end
+
 function LinearAlgebra.mul!(p::Piecewise, p1::AbstractPiecewise, p2::AbstractPiecewise,
                                 α = true, β = false)
     @assert nodes(p) == nodes(p1) == nodes(p2)
-    for i = 1:length(p)
+    @inbounds for i = 1:length(p)
         mul!(p[i], p1[i], p2[i], α, β)
     end
     return p

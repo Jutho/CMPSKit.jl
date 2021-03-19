@@ -53,8 +53,6 @@ function _transferleft!(ρ::TaylorSeries, h::TaylorSeries,
             end
         end
     end
-    # not converged:
-    @show tol, norm.(ρ.coeffs) .* (Δx).^(0:Kmax)
     return ρ, false
 end
 

@@ -43,6 +43,7 @@ include("operators/sumofterms.jl")
 include("operators/hamiltonians.jl")
 
 include("abstractcmps.jl")
+include("transfer.jl")
 
 include("finitecmps/finitecmps.jl")
 include("finitecmps/transfer.jl")

@@ -19,8 +19,8 @@ abstract type FunctionSpace{T} end # functions that support taking linear combin
 abstract type FunctionSeries{T} <: FunctionSpace{T} end
 const Const = Union{Number, AbstractArray}
 
-scalartype(::Type{<:FunctionSeries{T}}) where T = scalartype(T)
-Base.eltype(::Type{<:FunctionSeries{T}}) where T = T
+scalartype(::Type{<:FunctionSpace{T}}) where T = scalartype(T)
+Base.eltype(::Type{<:FunctionSpace{T}}) where T = T
 
 _rtoldefault(x, y, atol) =
     Base.rtoldefault(scalartype(eltype(x)), scalartype(eltype(y)), atol)

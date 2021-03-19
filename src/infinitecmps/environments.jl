@@ -6,6 +6,7 @@ defaulteigalg(Ψ::FourierCMPS) =
 defaultlinalg(Ψ::FourierCMPS) =
     GMRES(; krylovdim = min(256, (10*nummodes(Ψ.Q)+1)*virtualdim(Ψ)^2))
 
+# CMPS environements
 function leftenv(Ψ::InfiniteCMPS, ρ₀ = one(Ψ.Q);
                     eigalg = defaulteigalg(Ψ),
                     linalg = nothing, # ignored
@@ -86,6 +87,9 @@ function environments!(Ψ::InfiniteCMPS, ρL₀ = one(Ψ.Q), ρR₀ = one(Ψ.Q);
     return ρL, ρR, infoL, infoR
 end
 
+# Environments of Hamiltonian with CMPS
+const InfiniteCMPSData = Tuple{InfiniteCMPS,PeriodicMatrixFunction,PeriodicMatrixFunction}
+
 function leftenv!(H::LocalHamiltonian, Ψ::InfiniteCMPS, HL₀ = zero(Ψ.Q); kwargs...)
     domain(H) == domain(Ψ) || throw(DomainMismatch())
     ρL, ρR, infoL, infoR = environments!(Ψ; kwargs...)
@@ -97,8 +101,6 @@ function rightenv!(H::LocalHamiltonian, Ψ::InfiniteCMPS, HR₀ = zero(Ψ.Q); kw
     ρL, ρR, infoL, infoR = environments!(Ψ; kwargs...)
     return rightenv(H, (Ψ,ρL,ρR), HR₀; kwargs...)
 end
-
-const InfiniteCMPSData = Tuple{InfiniteCMPS,PeriodicMatrixFunction,PeriodicMatrixFunction}
 
 # assumes Ψ is normalized and ⟨ρL|ρR⟩ = 1
 function leftenv(H::LocalHamiltonian, Ψρs::InfiniteCMPSData, HL₀ = nothing;

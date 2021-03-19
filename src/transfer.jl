@@ -12,10 +12,10 @@ struct RightTransfer{T,N}
     R₂s::NTuple{N,T}
 end
 
-LeftTransfer(ψ₁::CMPS, ψ₂::CMPS = ψ₁) where {CMPS<:InfiniteCMPS} =
+LeftTransfer(ψ₁::CMPS, ψ₂::CMPS = ψ₁) where {CMPS<:AbstractCMPS} =
     LeftTransfer(ψ₁.Q, ψ₂.Q, ψ₁.Rs, ψ₂.Rs)
 
-RightTransfer(ψ₁::CMPS, ψ₂::CMPS = ψ₁) where {CMPS<:InfiniteCMPS} =
+RightTransfer(ψ₁::CMPS, ψ₂::CMPS = ψ₁) where {CMPS<:AbstractCMPS} =
     RightTransfer(ψ₁.Q, ψ₂.Q, ψ₁.Rs, ψ₂.Rs)
 
 scalartype(::Type{<:LeftTransfer{T}}) where T = scalartype(T)
