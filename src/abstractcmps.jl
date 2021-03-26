@@ -67,8 +67,17 @@ function expval(ops::LocalOperator, Ψ::AbstractCMPS, ρL = nothing, ρR = nothi
     if isnothing(ρR)
         ρR, = rightenv(Ψ; kwargs...)
     end
-    Z = real(dot(ρL, ρR))
-    ev = sum(coeff*_expval(op, Ψ.Q, Ψ.Rs, ρL, ρR)
+    (a, b) = domain(Ψ)
+    ZL = localdot(ρL, ρR)
+    Z = real(ZL(a))
+    Zb = ZL(b)
+    Z ≈ Zb || warn("error in computing normalisation: Za = $Z, Zb = $Zb")
+    ev = sum(coeff * _expval(op, Ψ.Q, Ψ.Rs, ρL, ρR)
                 for (coeff, op) in zip(coefficients(ops), operators(ops)))
     return ev/Z
+end
+
+function expval(H::LocalHamiltonian, Ψ::AbstractCMPS, ρL = nothing, ρR = nothing; kwargs...)
+    @assert domain(H) == domain(Ψ)
+    return integrate(expval(H.h, Ψ, ρL, ρR; kwargs...), domain(H))
 end

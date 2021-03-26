@@ -28,8 +28,16 @@ function gradient(H::LocalHamiltonian, Ψρs::InfiniteCMPSData, HL = nothing, HR
     for (coeff, op) in zip(coefficients(H.h), operators(H.h))
         if coeff isa Number
             axpy!.(coeff, localgradientRs(op, Q, Rs, ρL, ρR), gradRs)
+            if op isa ContainsDifferentiatedCreation && !(Q isa Constant)
+                grad∂Rs = localgradient∂Rs(op, Q, Rs, ρL, ρR)
+                axpy!.(-coeff, ∂.(grad∂Rs), gradRs)
+            end
         else
             mul!.(gradRs, (coeff,), localgradientRs(op, Q, Rs, ρL, ρR), 1, 1)
+            if op isa ContainsDifferentiatedCreation && !(Q isa Constant)
+                grad∂Rs = localgradient∂Rs(op, Q, Rs, ρL, ρR)
+                mul!.(gradRs, (-coeff,), ∂.(grad∂Rs), 1, 1)
+            end
         end
     end
     mul!.(gradRs, (HL,), Rs .* (ρR,), 1, 1)

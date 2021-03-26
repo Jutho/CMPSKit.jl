@@ -120,13 +120,13 @@ function environments!(Ψ::FiniteCMPS; Kmax = 50, tol = eps())
     (a, b) = domain(Ψ)
     Za = localZ(a)
     Zb = localZ(b)
-    abs(Za -1 ) < defaulttol(Za) && abs(Zb-1) < defaulttol(Zb) ||
+    abs(Za-1) < defaulttol(Za) && abs(Zb-1) < defaulttol(Zb) ||
         @warn "Incompatible environment normalizations: Z = ⟨ρL|ρR⟩ = $Za = $Zb"
     return ρL, ρR, infoL, infoR
 end
 
 # Environments of the CMPS with the Hamiltonian
-const FiniteCMPSData = Tuple{FiniteCMPS, MatrixFunction, MatrixFunction}
+const FiniteCMPSData = Tuple{FiniteCMPS{<:PiecewiseLinear}, Piecewise, Piecewise}
 
 function leftenv!(H::LocalHamiltonian, Ψ::FiniteCMPS; kwargs...)
     domain(H) == domain(Ψ) || throw(DomainMismatch())

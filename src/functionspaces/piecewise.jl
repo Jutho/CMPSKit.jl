@@ -122,14 +122,14 @@ function LinearAlgebra.mul!(pdst::Piecewise, psrc::Piecewise, α::Const)
     return pdst
 end
 
-function LinearAlgebra.axpy!(α, px::Piecewise, py::Piecewise)
+function LinearAlgebra.axpy!(α, px::AbstractPiecewise, py::Piecewise)
     @assert nodes(px) == nodes(py)
     for i = 1:length(px)
         axpy!(α, px[i], py[i])
     end
     return py
 end
-function LinearAlgebra.axpby!(α, px::Piecewise, β, py::Piecewise)
+function LinearAlgebra.axpby!(α, px::AbstractPiecewise, β, py::Piecewise)
     @assert nodes(px) == nodes(py)
     for i = 1:length(px)
         axpby!(α, px[i], β, py[i])

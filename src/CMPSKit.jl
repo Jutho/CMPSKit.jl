@@ -1,7 +1,5 @@
 module CMPSKit
 
-export expval, average_energy, energy_density
-
 export virtualdim
 export leftenv, rightenv, leftenv!, rightenv!, environments!
 export leftgauge, rightgauge, leftgauge!, rightgauge!,
@@ -48,9 +46,9 @@ include("transfer.jl")
 include("finitecmps/finitecmps.jl")
 include("finitecmps/transfer.jl")
 include("finitecmps/environments.jl")
+include("finitecmps/gradients.jl")
 
 include("infinitecmps/infinitecmps.jl")
-include("infinitecmps/transfer.jl")
 include("infinitecmps/environments.jl")
 include("infinitecmps/gauging.jl")
 include("infinitecmps/gradients.jl")

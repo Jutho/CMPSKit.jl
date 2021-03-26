@@ -164,3 +164,19 @@ function LinearAlgebra.axpby!(α, px::PiecewiseLinear, β, py::PiecewiseLinearAr
     end
     return py
 end
+
+function LinearAlgebra.dot(p1::PiecewiseLinear, p2::PiecewiseLinear)
+    @assert nodes(p1) == nodes(p2)
+    n = nodes(p1)
+    v1 = nodevalues(p1)
+    v2 = nodevalues(p2)
+    s = dot(v1[1], v2[1]) * (n[2] - n[1])/3
+    for i = 2:length(n)-1
+        s += (dot(v1[i], v2[i-1]) + dot(v1[i-1], v2[i])) * (n[i]-n[i-1])/6
+        s += dot(v1[i], v2[i]) * (n[i+1] - n[i-1])/3
+    end
+    i = length(n)
+    s += (dot(v1[i], v2[i-1]) + dot(v1[i-1], v2[i])) * (n[i]-n[i-1])/6
+    s += dot(v1[i], v2[i]) * (n[i] - n[i-1])/3
+    return s
+end
