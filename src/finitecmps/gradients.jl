@@ -88,6 +88,34 @@ function gradient(H::LocalHamiltonian, Ψρs::FiniteCMPSData, HL = nothing, HR =
     return Q̄, R̄s, v̄L, v̄R
 end
 
+function gradient2(H::LocalHamiltonian, Ψρs::FiniteCMPSData, HL = nothing, HR = nothing;
+                    gradpoints = 1:length(nodes(Ψρs[1].Q)), kwargs...)
+
+    Q̄, R̄s, v̄L, v̄R = gradient(H, Ψρs, HL, HR; gradpoints = gradpoints, kwargs...)
+
+    Ψ, ρL, ρR = Ψρs
+    Q, Rs, vL, vR = Ψ
+
+    grid = nodes(Q)
+    gQ = Qmetric(grid)
+    gR = Rmetric(grid)
+    igQ = inv(gQ)
+    igR = inv(gR)
+
+    gradgrid = grid[gradpoints]
+
+    Q̄ = PiecewiseLinear(gradgrid, igQ*Q̄)
+    R̄s = map(R̄->PiecewiseLinear(gradgrid, igR*R̄), R̄s)
+
+    if gradpoints != 1:length(grid)
+        # resample
+        Q̄ = PiecewiseLinear(grid, Q̄.(grid))
+        R̄s = map(R̄->PiecewiseLinear(grid, R̄.(grid)), R̄s)
+    end
+
+    return Q̄, R̄s, v̄L, v̄R
+end
+
 # Compute the gradient as a continuous function, represented as Piecewise{TaylorSeries}
 function _gradient(H::LocalHamiltonian, Ψρs::FiniteCMPSData, HL, HR, Z, E)
     Ψ, ρL, ρR = Ψρs
