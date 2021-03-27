@@ -47,6 +47,7 @@ include("finitecmps/finitecmps.jl")
 include("finitecmps/transfer.jl")
 include("finitecmps/environments.jl")
 include("finitecmps/gradients.jl")
+include("finitecmps/groundstate.jl")
 
 include("infinitecmps/infinitecmps.jl")
 include("infinitecmps/environments.jl")

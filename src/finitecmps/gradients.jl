@@ -1,9 +1,9 @@
 function gradient(H::LocalHamiltonian, Ψρs::FiniteCMPSData, HL = nothing, HR = nothing;
-                    gradpoints = 1:length(nodes(Ψρs[1].Q)), kwargs...)
+                    gradindices = 1:length(nodes(Ψρs[1].Q)), kwargs...)
 
-    @assert first(gradpoints) == 1
-    @assert last(gradpoints) == length(nodes(Ψρs[1].Q))
-    @assert issorted(gradpoints)
+    @assert first(gradindices) == 1
+    @assert last(gradindices) == length(nodes(Ψρs[1].Q))
+    @assert issorted(gradindices)
 
     Ψ, ρL, ρR = Ψρs
     if isnothing(HL)
@@ -21,15 +21,15 @@ function gradient(H::LocalHamiltonian, Ψρs::FiniteCMPSData, HL = nothing, HR =
     gradQ, gradRs, grad∂Rs = _gradient(H, Ψρs, HL, HR, Z, E)
 
     # Compute gradients with respect to PiecewiseLinear parameters
-    Q̄ = [zero(Q(a)) for _ = 1:length(gradpoints)]
-    R̄s = map(R->[zero(Q(a)) for _ = 1:length(gradpoints)], Rs)
+    Q̄ = [zero(Q(a)) for _ = 1:length(gradindices)]
+    R̄s = map(R->[zero(Q(a)) for _ = 1:length(gradindices)], Rs)
     v̄L = (HR(a)*vL - E*ρR(a)*vL)/Z
     v̄R = (HL(b)*vR - E*ρL(b)*vR)/Z
 
     grid = nodes(Q)
 
-    k = gradpoints[1] # == 1
-    knext = gradpoints[2]
+    k = gradindices[1] # == 1
+    knext = gradindices[2]
     xc = grid[k]
     xb = grid[knext]
     t = TaylorSeries([1,-1/(xb-xc)], xc)
@@ -40,10 +40,10 @@ function gradient(H::LocalHamiltonian, Ψρs::FiniteCMPSData, HL = nothing, HR =
     end
     Q̄[1] = Q̄i
 
-    for i = 2:length(gradpoints)-1
-        k = gradpoints[i]
-        kprev = gradpoints[i-1]
-        knext = gradpoints[i+1]
+    for i = 2:length(gradindices)-1
+        k = gradindices[i]
+        kprev = gradindices[i-1]
+        knext = gradindices[i+1]
         xa = grid[kprev]
         xc = grid[k]
         xb = grid[knext]
@@ -72,8 +72,8 @@ function gradient(H::LocalHamiltonian, Ψρs::FiniteCMPSData, HL = nothing, HR =
         setindex!.(R̄s, R̄is, i)
     end
 
-    k = gradpoints[end]
-    kprev = gradpoints[end-1]
+    k = gradindices[end]
+    kprev = gradindices[end-1]
     xa = grid[kprev]
     xc = grid[k]
 
@@ -89,9 +89,9 @@ function gradient(H::LocalHamiltonian, Ψρs::FiniteCMPSData, HL = nothing, HR =
 end
 
 function gradient2(H::LocalHamiltonian, Ψρs::FiniteCMPSData, HL = nothing, HR = nothing;
-                    gradpoints = 1:length(nodes(Ψρs[1].Q)), kwargs...)
+                    gradindices = 1:length(nodes(Ψρs[1].Q)), kwargs...)
 
-    Q̄, R̄s, v̄L, v̄R = gradient(H, Ψρs, HL, HR; gradpoints = gradpoints, kwargs...)
+    Q̄, R̄s, v̄L, v̄R = gradient(H, Ψρs, HL, HR; gradindices = gradindices, kwargs...)
 
     Ψ, ρL, ρR = Ψρs
     Q, Rs, vL, vR = Ψ
@@ -102,12 +102,12 @@ function gradient2(H::LocalHamiltonian, Ψρs::FiniteCMPSData, HL = nothing, HR 
     igQ = inv(gQ)
     igR = inv(gR)
 
-    gradgrid = grid[gradpoints]
+    gradgrid = grid[gradindices]
 
     Q̄ = PiecewiseLinear(gradgrid, igQ*Q̄)
     R̄s = map(R̄->PiecewiseLinear(gradgrid, igR*R̄), R̄s)
 
-    if gradpoints != 1:length(grid)
+    if gradindices != 1:length(grid)
         # resample
         Q̄ = PiecewiseLinear(grid, Q̄.(grid))
         R̄s = map(R̄->PiecewiseLinear(grid, R̄.(grid)), R̄s)

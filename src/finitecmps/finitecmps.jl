@@ -21,3 +21,5 @@ FiniteCMPS(Q::T, R::T, vL::V, vR::V) where {T,V} = FiniteCMPS(Q, (R,), vL, vR)
 domain(Ψ::FiniteCMPS) = domain(Ψ.Q)
 
 Base.iterate(Ψ::FiniteCMPS, args...) = iterate((Ψ.Q, Ψ.Rs, Ψ.vL, Ψ.vR), args...)
+
+Base.copy(Ψ::FiniteCMPS) = FiniteCMPS(copy(Ψ.Q), copy.(Ψ.Rs), copy(Ψ.vL), copy(Ψ.vR))

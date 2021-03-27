@@ -115,7 +115,7 @@ end
 function environments!(Ψ::FiniteCMPS; Kmax = 50, tol = eps())
     ρL, infoL = leftenv!(Ψ; Kmax = Kmax, tol = tol)
     ρR, λR, infoR = rightenv(Ψ; Kmax = Kmax, tol = tol)
-    λR < 10*tol || @warn "Incompatible normalization between left and right environments"
+    λR < 10*tol || @warn "Incompatible normalization between left and right environments: λR = $λR"
     localZ = localdot(ρL, ρR)
     (a, b) = domain(Ψ)
     Za = localZ(a)
@@ -228,7 +228,7 @@ function environments(H::LocalHamiltonian, Ψρs::FiniteCMPSData; kwargs...)
     HR, ER, eR, hR, infoHR = rightenv(H, Ψρs; kwargs...)
     EL ≈ ER ||
         @warn "non-matching energy from left and right environments"
-    E = (EL+ER/2)
+    E = (EL+ER)/2
     e = rmul!(eL + eR, 1//2)
     return HL, HR, hL, hR, E, e, infoHL, infoHR
 end
