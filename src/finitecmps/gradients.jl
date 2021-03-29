@@ -97,12 +97,12 @@ function gradient2(H::LocalHamiltonian, Ψρs::FiniteCMPSData, HL = nothing, HR 
     Q, Rs, vL, vR = Ψ
 
     grid = nodes(Q)
-    gQ = Qmetric(grid)
-    gR = Rmetric(grid)
+    gradgrid = grid[gradindices]
+    gQ = Qmetric(gradgrid)
+    gR = Rmetric(gradgrid)
     igQ = inv(gQ)
     igR = inv(gR)
 
-    gradgrid = grid[gradindices]
 
     Q̄ = PiecewiseLinear(gradgrid, igQ*Q̄)
     R̄s = map(R̄->PiecewiseLinear(gradgrid, igR*R̄), R̄s)

@@ -8,6 +8,7 @@ export InfiniteCMPS, FiniteCMPS, LeftTransfer, RightTransfer
 export Constant, FourierSeries, TaylorSeries, PiecewiseLinear
 export fit, differentiate, integrate, localdot, domain, period, nummodes, density
 export leftreducedoperator, rightreducedoperator, expval, gradient, groundstate
+export groundstate2
 
 export ψ, ∂ψ, ∂, ∫
 

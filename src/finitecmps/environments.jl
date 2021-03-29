@@ -115,7 +115,7 @@ end
 function environments!(Ψ::FiniteCMPS; Kmax = 50, tol = eps())
     ρL, infoL = leftenv!(Ψ; Kmax = Kmax, tol = tol)
     ρR, λR, infoR = rightenv(Ψ; Kmax = Kmax, tol = tol)
-    λR < 10*tol || @warn "Incompatible normalization between left and right environments: λR = $λR"
+    λR < 1000*tol || @warn "Incompatible normalization between left and right environments: λR = $λR"
     localZ = localdot(ρL, ρR)
     (a, b) = domain(Ψ)
     Za = localZ(a)
