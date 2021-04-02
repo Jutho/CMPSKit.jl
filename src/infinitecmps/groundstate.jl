@@ -177,13 +177,14 @@ function groundstate(H::LocalHamiltonian, Ψ₀::FourierCMPS;
         return (dK1, dR1s)
     end
 
-    function precondition(x, d)
-        ΨL, ρR, = x
-        dK, dRs = d
-        ρinv = posreginv(ρR[0], δ)
-        dKρinv = sylvester(inv(ρinv), inv(ρinv), dK)
-        return (dKρinv, dRs .* Ref(ρinv))
-    end
+    # TODO: make this work and test this
+    # function precondition(x, d)
+    #     ΨL, ρR, = x
+    #     dK, dRs = d
+    #     ρinv = posreginv(ρR[0], δ)
+    #     dKρinv = sylvester(inv(ρinv), inv(ρinv), dK)
+    #     return (dKρinv, dRs .* Ref(ρinv))
+    # end
 
     function _finalize!(x, E, d, numiter)
         normgrad2 = real(inner(x, d, d))
@@ -211,7 +212,7 @@ function groundstate(H::LocalHamiltonian, Ψ₀::FourierCMPS;
 
     x, E, grad, numfg, history =
         optimize(fg, x, optalg; retract = retract,
-                                precondition = precondition,
+                                # precondition = precondition, # TODO
                                 finalize! = _finalize!,
                                 inner = inner, transport! = transport!,
                                 scale! = scale!, add! = add!,

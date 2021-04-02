@@ -94,19 +94,31 @@ end
 
         @test CMPSKit.localgradientRs(ψ[1], Q, Rs, ρL, ρR) == (zero(Q), zero(Q))
         @test CMPSKit.localgradientRs(ψ[1]^2, Q, Rs, ρL, ρR) == (zero(Q), zero(Q))
+        @test CMPSKit.localgradient∂Rs(ψ[1]^2, Q, Rs, ρL, ρR) == (zero(Q), zero(Q))
+
         @test CMPSKit.localgradientRs(∂ψ[1], Q, Rs, ρL, ρR) == (zero(Q), zero(Q))
+        @test CMPSKit.localgradient∂Rs(∂ψ[1], Q, Rs, ρL, ρR) == (zero(Q), zero(Q))
+
         @test all(isapprox.(CMPSKit.localgradientRs(ψ[2]', Q, Rs, ρL, ρR),
                             (zero(Q), ρL*ρR)))
         @test all(isapprox.(CMPSKit.localgradientRs((ψ[2]')^2, Q, Rs, ρL, ρR),
                             (zero(Q), R2'*ρL*ρR + ρL*ρR*R2')))
+
         @test all(isapprox.(CMPSKit.localgradientRs(∂(ψ[2]'), Q, Rs, ρL, ρR),
-                            (zero(Q), Q'*ρL*ρR - ρL*ρR*Q' - ∂(ρL*ρR))))
-        @test all(isapprox.(CMPSKit.localgradientRs(∂(ψ[2]'), Q, Rs, ρL, ρR),
-                            (zero(Q), Q'*ρL*ρR - ρL*ρR*Q' - ∂(ρL*ρR))))
+                            (zero(Q), Q'*ρL*ρR - ρL*ρR*Q')))
+        @test all(isapprox.(CMPSKit.localgradient∂Rs(∂(ψ[2]'), Q, Rs, ρL, ρR),
+                            (zero(Q), ρL*ρR)))
+
         @test all(isapprox.(CMPSKit.localgradientRs((∂ψ[1])'*∂ψ[2], Q, Rs, ρL, ρR),
-                            (Q'*ρL*QR2*ρR - ρL*QR2*ρR*Q' - ∂(ρL*QR2*ρR), zero(Q))))
+                            (Q'*ρL*QR2*ρR - ρL*QR2*ρR*Q', zero(Q))))
+        @test all(isapprox.(CMPSKit.localgradient∂Rs((∂ψ[1])'*∂ψ[2], Q, Rs, ρL, ρR),
+                            (ρL*QR2*ρR, zero(Q))))
+
         @test all(isapprox.(CMPSKit.localgradientRs(ψ[1]'*ψ[2], Q, Rs, ρL, ρR),
                             (ρL*R2*ρR, zero(Q))))
+        @test all(isapprox.(CMPSKit.localgradient∂Rs(ψ[1]'*ψ[2], Q, Rs, ρL, ρR),
+                            (zero(Q), zero(Q))))
+
         @test all(isapprox.(CMPSKit.localgradientRs((ψ[1]')^2*ψ[1]^2, Q, Rs, ρL, ρR),
                             (R1'*ρL*R1*R1*ρR + ρL*R1*R1*ρR*R1', zero(Q))))
     end
@@ -149,47 +161,25 @@ end
     H = ∫(∂ψ'*∂ψ + α*ψ'*ψ + β*(ψ*ψ + ψ'*ψ') + γ*(ψ')^2*ψ^2, (-Inf,+Inf))
     Kmax = 10
 
-    A = FourierSeries([exp(-4*(j>>1))*randn(T, (D,D)) for j=1:5])
-    A = (A - A')/2
-    R = FourierSeries([exp(-4*(j>>1))*randn(T, (D,D)) for j=1:3])
-    Q = A - 1/2 * R'*R
-    Ψ = InfiniteCMPS(Q, R)
-
     eigalg = Arnoldi(; krylovdim = D^2*(2*Kmax+1), tol = 1e-10)
-    ρL, ρR = environments!(Ψ; eigalg = eigalg, Kmax = Kmax)
-
     linalg = GMRES(; krylovdim = D^2*(2*Kmax+1), tol = 1e-10, maxiter = 1)
-
-    HL, = leftenv(H, (Ψ, ρL, ρR); linalg = linalg, Kmax = Kmax)
-    HR, = rightenv(H, (Ψ, ρL, ρR); linalg = linalg, Kmax = Kmax)
-
-
     optalg = ConjugateGradient(; gradtol = 1e-7, verbosity = 2)
 
-    ΨL, ρR, E, e, normgrad, numfg, history =
-        groundstate(H, Ψ;
-                    optalg = optalg, eigalg = eigalg, linalg = linalg, Kmax = Kmax)
-
-    ΨL, ρR, E, e, normgrad, numfg, history =
-        groundstate(H, ΨL;
-                    optalg = optalg, eigalg = eigalg, linalg = linalg, Kmax = Kmax)
-
-
-
     gradtol = 1e-7
-    optalg = ConjugateGradient(; gradtol = gradtol)
-    eigalg = Arnoldi(; krylovdim = 16, tol = 1e-10)
-    linalg = GMRES(; krylovdim = 16, tol = 1e-10)
+    optalg = LBFGS(30; verbosity = 2, gradtol = gradtol)
+    eigalg = Arnoldi(; krylovdim = 64, tol = 1e-10)
+    linalg = GMRES(; krylovdim = 64, tol = 1e-10)
     for k = 1:3
-        Q = Constant(randn(T, (D,D)))
-        R = Constant(randn(T, (D,D)))
+        A = FourierSeries([exp(-4*(j>>1))*randn(T, (D,D)) for j=1:5])
+        A = (A - A')/2
+        R = FourierSeries([exp(-4*(j>>1))*randn(T, (D,D)) for j=1:3])
+        Q = A - 1/2 * R'*R
+        Ψ = InfiniteCMPS(Q, R)
 
         ΨL, ρR, E, e, normgrad, numfg, history =
-            groundstate(H, InfiniteCMPS(Q, R);
-                        optalg = optalg, eigalg = eigalg, linalg = linalg)
-        @test E ≈ -0.43306384063961445
-        @test abs(expval(ψ, ΨL, one(ρR), ρR)(0)) < gradtol
-        @test expval(ψ'*ψ, ΨL, one(ρR), ρR)(0) ≈ 0.5086468402292694 atol=gradtol
+            groundstate(H, Ψ;
+                        optalg = optalg, eigalg = eigalg, linalg = linalg, Kmax = Kmax)
+
+        @test E ≈ -0.237009267457
     end
 end
-linalg = GMRES(; krylovdim = 16, tol = 1e-10)
