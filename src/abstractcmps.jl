@@ -68,6 +68,12 @@ function expval(ops::LocalOperator, Ψ::AbstractCMPS, ρL = nothing, ρR = nothi
         ρR, = rightenv(Ψ; kwargs...)
     end
     (a, b) = domain(Ψ)
+    if !isfinite(a)
+        a = zero(a)
+    end
+    if !isfinite(b)
+        b = oneunit(b)
+    end
     ZL = localdot(ρL, ρR)
     Z = real(ZL(a))
     Zb = ZL(b)

@@ -180,6 +180,7 @@ end
             groundstate(H, Ψ;
                         optalg = optalg, eigalg = eigalg, linalg = linalg, Kmax = Kmax)
 
-        @test E ≈ -0.237009267457
+        @test E ≈ -0.237009267723921
+        @test ∫(expval(ψ'*ψ, ΨL, one(ρR), ρR), (0,1)) ≈ 0.5616439424330847 atol=gradtol
     end
 end
