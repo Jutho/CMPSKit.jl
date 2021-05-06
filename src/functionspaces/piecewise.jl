@@ -21,6 +21,9 @@ nodevalues(p::Piecewise) = Base.Generator(p, nodes(p))
 
 Base.length(p::Piecewise) = length(p.elements)
 
+Base.:(==)(p1::Piecewise, p2::Piecewise) =
+    nodes(p1) == nodes(p2) && elements(p1) == elements(p2)
+
 # Indexing, getting and setting elements
 @inline Base.getindex(p::Piecewise, i) = getindex(p.elements, i)
 @inline Base.setindex!(p::Piecewise, v, i) = setindex!(p.elements, v, i)
@@ -65,18 +68,22 @@ Base.:-(p::AbstractPiecewise) = Piecewise(nodes(p), map(-, elements(p)))
 
 function Base.:+(p1::AbstractPiecewise, p2::AbstractPiecewise)
     @assert nodes(p1) == nodes(p2)
-    return Piecewise(nodes(p1), [p1[i] + p2[i] for i = 1:length(p1)])
+    return Piecewise(nodes(p1), map(+, elements(p1), elements(p2)))
 end
 
 function Base.:-(p1::AbstractPiecewise, p2::AbstractPiecewise)
     @assert nodes(p1) == nodes(p2)
-    return Piecewise(nodes(p1), [p1[i] - p2[i] for i = 1:length(p1)])
+    return Piecewise(nodes(p1), map(-, elements(p1), elements(p2)))
 end
 
-Base.:*(p::AbstractPiecewise, a::Const) = Piecewise(nodes(p), map(x->x*a, elements(p)))
-Base.:*(a::Const, p::AbstractPiecewise) = Piecewise(nodes(p), map(x->a*x, elements(p)))
-Base.:/(p::AbstractPiecewise, a) = Piecewise(nodes(p), map(x->x/a, elements(p)))
-Base.:\(a, p::AbstractPiecewise) = Piecewise(nodes(p), map(x->a\x, elements(p)))
+Base.:*(p::AbstractPiecewise, a::Const) =
+    Piecewise(nodes(p), map(Base.Fix2(*, a), elements(p)))
+Base.:*(a::Const, p::AbstractPiecewise) =
+    Piecewise(nodes(p), map(Base.Fix1(*, a), elements(p)))
+Base.:/(p::AbstractPiecewise, a) =
+    Piecewise(nodes(p), map(Base.Fix2(/, a), elements(p)))
+Base.:\(a, p::AbstractPiecewise) =
+    Piecewise(nodes(p), map(Base.Fix1(\, a), elements(p)))
 
 Base.:*(p1::AbstractPiecewise, p2::AbstractPiecewise) = truncmul(p1, p2)
 function truncmul(p1::AbstractPiecewise, p2::AbstractPiecewise; kwargs...)

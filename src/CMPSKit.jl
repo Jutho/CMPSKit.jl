@@ -21,6 +21,8 @@ scalartype(x::Any) = scalartype(typeof(x))
 scalartype(T::Type{<:Number}) = T
 scalartype(::Type{<:AbstractArray{T}}) where T = T
 
+defaulttol(x::Any) = eps(real(float(one(scalartype(x)))))
+
 isscalar(x) = false
 isscalar(x::Number) = true
 
@@ -47,6 +49,7 @@ include("transfer.jl")
 include("finitecmps/finitecmps.jl")
 include("finitecmps/transfer.jl")
 include("finitecmps/environments.jl")
+include("finitecmps/tangent.jl")
 include("finitecmps/gradients.jl")
 include("finitecmps/groundstate.jl")
 

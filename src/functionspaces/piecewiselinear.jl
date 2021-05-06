@@ -19,6 +19,9 @@ nodevalues(p::PiecewiseLinear) = p.values
 
 Base.length(p::PiecewiseLinear) = length(p.values) - 1
 
+Base.:(==)(p1::PiecewiseLinear, p2::PiecewiseLinear) =
+    nodes(p1) == nodes(p2) && nodevalues(p1) == nodevalues(p2)
+
 # Indexing, getting (and setting) coefficients
 function Base.getindex(p::PiecewiseLinear, i)
     1 <= i <= length(p) || throw(BoundsError(p, i))
@@ -83,6 +86,14 @@ end
 
 function Base.:*(p::PiecewiseLinear, α::Const)
     return PiecewiseLinear(nodes(p), nodevalues(p) .* (α,))
+end
+
+function Base.:\(α::Const, p::PiecewiseLinear)
+    return PiecewiseLinear(nodes(p), (α,) .\ nodevalues(p))
+end
+
+function Base.:/(p::PiecewiseLinear, α::Const)
+    return PiecewiseLinear(nodes(p), nodevalues(p) ./ (α,))
 end
 
 # Arithmetic (in place / mutating methods)

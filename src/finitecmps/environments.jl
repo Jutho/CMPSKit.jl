@@ -1,34 +1,8 @@
 # Environments of the CMPS
-function leftenv(Ψ::FiniteCMPS{<:AbstractPiecewise}; Kmax = 50, tol = eps())
+function leftenv(Ψ::FiniteCMPS{<:AbstractPiecewise}; Kmax = 50, tol = defaulttol(Ψ))
     Q, Rs, vL, vR = Ψ
-    a, b = domain(Q)
-    grid = nodes(Q)
-    N = length(grid) - 1
-    ρ₁⁰ = zero(Q(a))
-    ρ₁⁰ = mul!(ρ₁⁰, vL, vL', true, true)
-    ρ₁ = TaylorSeries([ρ₁⁰], a)
-    ρs = Vector{typeof(ρ₁)}(undef, N)
-    ρs[1] = ρ₁
-    infoL = true
-    for i = 1:N
-        ρᵢ = ρs[i]
-        xᵢ = grid[i]
-        xⱼ = grid[i+1]
-        Δxᵢ = grid[i+1] - grid[i]
-        Qᵢ = shift!(Q[i], xᵢ)
-        Rᵢs = shift!.(getindex.(Rs, i), xᵢ)
-
-        # build Taylor coefficients (i.e. solve triangular problem)
-        ρᵢ, converged = _transferleft!(ρᵢ, zero(ρᵢ), Qᵢ, Rᵢs, Δxᵢ, Kmax, tol)
-        infoL &= converged
-        shift!(ρᵢ, (xᵢ+xⱼ)/2)
-
-        # initialize next ρ element
-        if i < N
-            ρs[i+1] = TaylorSeries([ρᵢ(xⱼ)], xⱼ)
-        end
-    end
-    ρL = Piecewise(grid, ρs)
+    a, b = domain(Ψ)
+    ρL, infoL = lefttransfer(vL*vL', nothing, Ψ; Kmax = Kmax, tol = tol)
     Z = vR'*ρL(b)*vR
     imag(Z) < defaulttol(Z) && real(Z) > 0 ||
         @warn "Non-positive left environment: Z = vR'*ρL(b)*vR = $Z"
@@ -36,7 +10,7 @@ function leftenv(Ψ::FiniteCMPS{<:AbstractPiecewise}; Kmax = 50, tol = eps())
     return ρL, λ, infoL
 end
 
-function leftenv!(Ψ; Kmax = 50, tol = eps())
+function leftenv!(Ψ; Kmax = 50, tol = defaulttol(Ψ))
     ρL, λ, infoL = leftenv(Ψ)
     (a,b) = domain(Ψ)
     Ψ.Q -= λ * one(Ψ.Q)
@@ -56,36 +30,10 @@ function leftenv!(Ψ; Kmax = 50, tol = eps())
     return ρL, infoL
 end
 
-function rightenv(Ψ::FiniteCMPS{<:AbstractPiecewise}; Kmax = 50, tol = eps())
+function rightenv(Ψ::FiniteCMPS{<:AbstractPiecewise}; Kmax = 50, tol = defaulttol(Ψ))
     Q, Rs, vL, vR = Ψ
     a, b = domain(Q)
-    grid = nodes(Q)
-    N = length(grid) - 1
-    ρN⁰ = zero(Q(b))
-    ρN⁰ = mul!(ρN⁰, vR, vR', true, true)
-    ρN = TaylorSeries([ρN⁰], b)
-    ρs = Vector{typeof(ρN)}(undef, N)
-    ρs[N] = ρN
-    infoR = true
-    for i = N:-1:1
-        ρᵢ = ρs[i]
-        xᵢ = grid[i]
-        xⱼ = grid[i+1]
-        Δxᵢ = grid[i+1] - grid[i]
-        Qᵢ = shift!(Q[i], xⱼ)
-        Rᵢs = shift!.(getindex.(Rs, i), xⱼ)
-
-        # build Taylor coefficients (i.e. solve triangular problem)
-        ρᵢ, converged = _transferright!(ρᵢ, zero(ρᵢ), Qᵢ, Rᵢs, Δxᵢ, Kmax, tol)
-        infoR &= converged
-        shift!(ρᵢ, (xᵢ+xⱼ)/2)
-
-        # initialize next ρ element
-        if i > 1
-            ρs[i-1] = TaylorSeries([ρᵢ(xᵢ)], xᵢ)
-        end
-    end
-    ρR = Piecewise(grid, ρs)
+    ρR, infoR = righttransfer(vR*vR', nothing, Ψ; Kmax = Kmax, tol = tol)
     Z = vL'*ρR(a)*vL
     imag(Z) < defaulttol(Z) && real(Z) > 0 ||
         @warn "Non-positive right environment: Z = vL'*ρR(a)*vL = $Z"
@@ -93,7 +41,7 @@ function rightenv(Ψ::FiniteCMPS{<:AbstractPiecewise}; Kmax = 50, tol = eps())
     return ρR, λ, infoR
 end
 
-function rightenv!(Ψ; Kmax = 50, tol = eps())
+function rightenv!(Ψ; Kmax = 50, tol = defaulttol(Ψ))
     ρR, λ, infoR = rightenv(Ψ)
     Ψ.Q -= λ * one(Ψ.Q)
     for i = 1:length(ρR)
@@ -112,15 +60,16 @@ function rightenv!(Ψ; Kmax = 50, tol = eps())
     return ρR, infoR
 end
 
-function environments!(Ψ::FiniteCMPS; Kmax = 50, tol = eps())
+function environments!(Ψ::FiniteCMPS; Kmax = 50, tol = defaulttol(Ψ))
     ρL, infoL = leftenv!(Ψ; Kmax = Kmax, tol = tol)
     ρR, λR, infoR = rightenv(Ψ; Kmax = Kmax, tol = tol)
-    λR < 1000*tol || @warn "Incompatible normalization between left and right environments: λR = $λR"
+    λR < 1000*tol ||
+        @warn "Incompatible normalization between left and right environments: λR = $λR"
     localZ = localdot(ρL, ρR)
     (a, b) = domain(Ψ)
     Za = localZ(a)
     Zb = localZ(b)
-    abs(Za-1) < defaulttol(Za) && abs(Zb-1) < defaulttol(Zb) ||
+    abs(Za-1) < sqrt(defaulttol(Za)) && abs(Zb-1) < sqrt(defaulttol(Zb)) ||
         @warn "Incompatible environment normalizations: Z = ⟨ρL|ρR⟩ = $Za = $Zb"
     return ρL, ρR, infoL, infoR
 end
@@ -141,79 +90,27 @@ function rightenv!(H::LocalHamiltonian, Ψ::FiniteCMPS; kwargs...)
 end
 
 # assumes Ψ is normalized and ⟨ρL|ρR⟩ = 1
-function leftenv(H::LocalHamiltonian, Ψρs::FiniteCMPSData; Kmax = 50, tol = eps())
+function leftenv(H::LocalHamiltonian, Ψρs::FiniteCMPSData;
+                    Kmax = 50, tol = defaulttol(Ψρs[1]))
     Ψ, ρL, ρR = Ψρs
     (a,b) = domain(Ψ)
     domain(H) == (a,b) || throw(DomainMismatch())
     hL = leftreducedoperator(H.h, Ψ, ρL)
     eL = localdot(hL, ρR)
     EL = integrate(eL, (a,b))
-    Q = Ψ.Q
-    Rs = Ψ.Rs
-    grid = nodes(hL)
-    HLs = similar(hL.elements)
-    N = length(HLs)
-    HLs[1] = TaylorSeries([zero(ρL(a))], a)
-    infoL = true
-    for i = 1:N
-        HLᵢ = HLs[i]
-        hLᵢ = hL[i]
-        xᵢ = grid[i]
-        xⱼ = grid[i+1]
-        Δxᵢ = grid[i+1] - grid[i]
-        Qᵢ = shift!(Q[i], xᵢ)
-        Rᵢs = shift!.(getindex.(Rs, i), xᵢ)
-        hLᵢ = shift(hL[i], xᵢ)
-
-        # build Taylor coefficients (i.e. solve triangular problem)
-        HLᵢ, converged = _transferleft!(HLᵢ, hLᵢ, Qᵢ, Rᵢs, Δxᵢ, Kmax, tol)
-        infoL &= converged
-        shift!(HLᵢ, (xᵢ+xⱼ)/2)
-        shift!(hL[i], (xᵢ+xⱼ)/2)
-
-        # initialize next ρ element
-        if i < N
-            HLs[i+1] = TaylorSeries([HLᵢ(xⱼ)], xⱼ)
-        end
-    end
-    HL = Piecewise(grid, HLs)
+    HL, infoL = lefttransfer(zero(hL(a)), hL, Ψ; Kmax = Kmax, tol = tol)
     return HL, EL, eL, hL, infoL
 end
 
-function rightenv(H::LocalHamiltonian, Ψρs::FiniteCMPSData; Kmax = 50, tol = eps())
+function rightenv(H::LocalHamiltonian, Ψρs::FiniteCMPSData;
+                    Kmax = 50, tol = defaulttol(Ψρs[1]))
     Ψ, ρL, ρR = Ψρs
     (a,b) = domain(Ψ)
     domain(H) == (a,b) || throw(DomainMismatch())
     hR = rightreducedoperator(H.h, Ψ, ρR)
     eR = localdot(ρL, hR)
     ER = integrate(eR, (a,b))
-    Q = Ψ.Q
-    Rs = Ψ.Rs
-    grid = nodes(hR)
-    HRs = similar(hR.elements)
-    N = length(HRs)
-    HRs[N] = TaylorSeries([zero(ρR(b))], b)
-    infoR = true
-    for i = N:-1:1
-        HRᵢ = HRs[i]
-        xᵢ = grid[i]
-        xⱼ = grid[i+1]
-        Δxᵢ = grid[i+1] - grid[i]
-        Qᵢ = shift(Q[i], xⱼ)
-        Rᵢs = shift.(getindex.(Rs, i), xⱼ)
-        hRᵢ = shift(hR[i], xⱼ)
-
-        # build Taylor coefficients (i.e. solve triangular problem)
-        HRᵢ, converged = _transferright!(HRᵢ, hRᵢ, Qᵢ, Rᵢs, Δxᵢ, Kmax, tol)
-        infoR &= converged
-        shift!(HRᵢ, (xᵢ+xⱼ)/2)
-
-        # initialize next ρ element
-        if i > 1
-            HRs[i-1] = TaylorSeries([HRᵢ(xᵢ)], xᵢ)
-        end
-    end
-    HR = Piecewise(grid, HRs)
+    HR, infoR = righttransfer(zero(hR(b)), hR, Ψ; Kmax = Kmax, tol = tol)
     return HR, ER, eR, hR, infoR
 end
 

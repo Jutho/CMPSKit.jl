@@ -1,5 +1,8 @@
 function gradient(H::LocalHamiltonian, Ψρs::FiniteCMPSData, HL = nothing, HR = nothing;
-                    gradindices = 1:length(nodes(Ψρs[1].Q)), kwargs...)
+                    gradindices = 1:length(nodes(Ψρs[1].Q)),
+                    left_boundary = :fixed,
+                    right_boundary = :fixed,
+                    kwargs...)
 
     @assert first(gradindices) == 1
     @assert last(gradindices) == length(nodes(Ψρs[1].Q))
@@ -19,101 +22,12 @@ function gradient(H::LocalHamiltonian, Ψρs::FiniteCMPSData, HL = nothing, HR =
     E = dot(vR, HL(b)*vR)/Z
 
     gradQ, gradRs, grad∂Rs = _gradient(H, Ψρs, HL, HR, Z, E)
+    ∇Q, ∇Rs = _project(gradQ, gradRs, grad∂Rs; gradindices = gradindices)
 
-    # Compute gradients with respect to PiecewiseLinear parameters
-    Q̄ = [zero(Q(a)) for _ = 1:length(gradindices)]
-    R̄s = map(R->[zero(Q(a)) for _ = 1:length(gradindices)], Rs)
-    v̄L = (HR(a)*vL - E*ρR(a)*vL)/Z
-    v̄R = (HL(b)*vR - E*ρL(b)*vR)/Z
+    ∇vL = left_boundary == :fixed ? zero(vL) : (HR(a)*vL - E*ρR(a)*vL)/Z
+    ∇vR = right_boundary == :fixed ? zero(vR) : (HL(b)*vR - E*ρL(b)*vR)/Z
 
-    grid = nodes(Q)
-
-    k = gradindices[1] # == 1
-    knext = gradindices[2]
-    xc = grid[k]
-    xb = grid[knext]
-    t = TaylorSeries([1,-1/(xb-xc)], xc)
-    Q̄i = Q̄[1]
-    for l = k:(knext-1)
-        t = shift!(t, offset(gradQ[l]))
-        Q̄i .+= integrate(gradQ[l] * t, (grid[l], grid[l+1]))
-    end
-    Q̄[1] = Q̄i
-
-    for i = 2:length(gradindices)-1
-        k = gradindices[i]
-        kprev = gradindices[i-1]
-        knext = gradindices[i+1]
-        xa = grid[kprev]
-        xc = grid[k]
-        xb = grid[knext]
-
-        Q̄i = Q̄[i]
-        R̄is = getindex.(R̄s, i)
-        t = TaylorSeries([0,1/(xc-xa)], xa)
-        for l = kprev:(k-1)
-            t = shift!(t, offset(gradQ[l]))
-            Q̄i .+= integrate(gradQ[l] * t, (grid[l], grid[l+1]))
-            for (R̄i, gradR, grad∂R) in zip(R̄is, gradRs, grad∂Rs)
-                R̄i .+= integrate(gradR[l] * t, (grid[l], grid[l+1]))
-                R̄i .+= integrate(grad∂R[l]/(xc-xa), (grid[l], grid[l+1]))
-            end
-        end
-        t = TaylorSeries([1,-1/(xb-xc)], xc)
-        for l = k:(knext-1)
-            t = shift!(t, offset(gradQ[l]))
-            Q̄i .+= integrate(gradQ[l] * t, (grid[l], grid[l+1]))
-            for (R̄i, gradR, grad∂R) in zip(R̄is, gradRs, grad∂Rs)
-                R̄i .+= integrate(gradR[l] * t, (grid[l], grid[l+1]))
-                R̄i .+= integrate(grad∂R[l]/(xc-xb), (grid[l], grid[l+1]))
-            end
-        end
-        setindex!(Q̄, Q̄i, i)
-        setindex!.(R̄s, R̄is, i)
-    end
-
-    k = gradindices[end]
-    kprev = gradindices[end-1]
-    xa = grid[kprev]
-    xc = grid[k]
-
-    Q̄i = Q̄[end]
-    t = TaylorSeries([0,1/(xc-xa)], xa)
-    for l = kprev:(k-1)
-        t = shift!(t, offset(gradQ[l]))
-        Q̄i .+= integrate(gradQ[l] * t, (grid[l], grid[l+1]))
-    end
-    Q̄[end] = Q̄i
-
-    return Q̄, R̄s, v̄L, v̄R
-end
-
-function gradient2(H::LocalHamiltonian, Ψρs::FiniteCMPSData, HL = nothing, HR = nothing;
-                    gradindices = 1:length(nodes(Ψρs[1].Q)), kwargs...)
-
-    Q̄, R̄s, v̄L, v̄R = gradient(H, Ψρs, HL, HR; gradindices = gradindices, kwargs...)
-
-    Ψ, ρL, ρR = Ψρs
-    Q, Rs, vL, vR = Ψ
-
-    grid = nodes(Q)
-    gradgrid = grid[gradindices]
-    gQ = Qmetric(gradgrid)
-    gR = Rmetric(gradgrid)
-    igQ = inv(gQ)
-    igR = inv(gR)
-
-
-    Q̄ = PiecewiseLinear(gradgrid, igQ*Q̄)
-    R̄s = map(R̄->PiecewiseLinear(gradgrid, igR*R̄), R̄s)
-
-    if gradindices != 1:length(grid)
-        # resample
-        Q̄ = PiecewiseLinear(grid, Q̄.(grid))
-        R̄s = map(R̄->PiecewiseLinear(grid, R̄.(grid)), R̄s)
-    end
-
-    return Q̄, R̄s, v̄L, v̄R
+    return FiniteCMPSTangent(Ψ, ∇Q, ∇Rs, ∇vL, ∇vR, gradindices)
 end
 
 # Compute the gradient as a continuous function, represented as Piecewise{TaylorSeries}
@@ -175,6 +89,7 @@ function Qmetric(grid)
     end
     return SymTridiagonal(dv, ev)
 end
+
 function Rmetric(grid)
     g = Qmetric(grid)
     g.dv[1] = g.dv[end] = 1

@@ -78,8 +78,8 @@ function expval(ops::LocalOperator, Ψ::AbstractCMPS, ρL = nothing, ρR = nothi
     Z = real(ZL(a))
     Zb = ZL(b)
     Z ≈ Zb || @warn "error in computing normalisation: Za = $Z, Zb = $Zb"
-    ev = sum(coeff * _expval(op, Ψ.Q, Ψ.Rs, ρL, ρR)
-                for (coeff, op) in zip(coefficients(ops), operators(ops)))
+    evs = _expval.(operators(ops), Ref(Ψ.Q), Ref(Ψ.Rs), Ref(ρL), Ref(ρR))
+    ev = sum(coefficients(ops) .* evs)
     return ev/Z
 end
 

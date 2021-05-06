@@ -23,3 +23,6 @@ domain(Ψ::FiniteCMPS) = domain(Ψ.Q)
 Base.iterate(Ψ::FiniteCMPS, args...) = iterate((Ψ.Q, Ψ.Rs, Ψ.vL, Ψ.vR), args...)
 
 Base.copy(Ψ::FiniteCMPS) = FiniteCMPS(copy(Ψ.Q), copy.(Ψ.Rs), copy(Ψ.vL), copy(Ψ.vR))
+
+Base.:(==)(Ψ1::FiniteCMPS, Ψ2::FiniteCMPS) =
+    Ψ1.Q == Ψ2.Q && Ψ1.Rs == Ψ2.Rs && Ψ1.vL == Ψ2.vL && Ψ1.vR == Ψ1.vR

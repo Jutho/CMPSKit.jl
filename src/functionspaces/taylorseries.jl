@@ -31,7 +31,7 @@ function shift!(f::TaylorSeries{T}, b) where T
     f.offset = b
     return f
 end
-shift(f::TaylorSeries, b) = b == offset(f) ? t : shift!(copy(f), b)
+shift(f::TaylorSeries, b) = b == offset(f) ? f : shift!(copy(f), b)
 
 function Base.:(==)(f1::TaylorSeries, f2::TaylorSeries)
     offset(f1) == offset(f2) || return (f1 == shift(f2, offset(f1)))
@@ -45,7 +45,7 @@ end
 # Indexing, getting and setting coefficients
 Base.eachindex(f::TaylorSeries) = 0:degree(f)
 function Base.getindex(f::TaylorSeries, k)
-    k < 0 && return BoundsError(f, k)
+    k < 0 && throw(BoundsError(f, k))
     @inbounds if k > degree(f)
         return zero(f.coeffs[1])
     else
