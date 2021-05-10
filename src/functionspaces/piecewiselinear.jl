@@ -1,4 +1,5 @@
-struct PiecewiseLinear{T, S<:AbstractVector{<:Real}} <: AbstractPiecewise{TaylorSeries{T}}
+# Type definition
+struct PiecewiseLinear{T, S<:AbstractVector{<:Real}} <: AbstractPiecewise{T,TaylorSeries{T}}
     nodes::S
     values::Vector{T}
     function PiecewiseLinear(nodes::S, values::Vector{T}) where {S<:AbstractVector,T}
@@ -11,11 +12,17 @@ struct PiecewiseLinear{T, S<:AbstractVector{<:Real}} <: AbstractPiecewise{Taylor
     end
 end
 
+# Basic properties
 nodes(p::PiecewiseLinear) = p.nodes
 elements(p::PiecewiseLinear) = Base.Generator(i->p[i], Base.OneTo(length(p)))
 nodevalues(p::PiecewiseLinear) = p.values
 
 Base.length(p::PiecewiseLinear) = length(p.values) - 1
+
+Base.:(==)(p1::PiecewiseLinear, p2::PiecewiseLinear) =
+    nodes(p1) == nodes(p2) && nodevalues(p1) == nodevalues(p2)
+
+# Indexing, getting (and setting) coefficients
 function Base.getindex(p::PiecewiseLinear, i)
     1 <= i <= length(p) || throw(BoundsError(p, i))
     v0 = p.values[i]
@@ -27,6 +34,7 @@ function Base.getindex(p::PiecewiseLinear, i)
     return TaylorSeries([(v0+v1)/2, (v1-v0)/dx], xmid)
 end
 
+# Use as function
 function (P::PiecewiseLinear)(x)
     nodes = P.nodes
     values = P.values
@@ -48,16 +56,18 @@ function (P::PiecewiseLinear)(x)
     end
 end
 
-for f in (:copy, :zero, :one, :conj, :transpose, :adjoint, :real, :imag, :-)
-    @eval Base.$f(p::PiecewiseLinear) = PiecewiseLinear(nodes(p), map($f, nodevalues(p)))
-end
-
+# Special purpose constructor
 function Base.similar(p::PiecewiseLinear{T}) where T
     if isbitstype(T)
         return PiecewiseLinear(nodes(p), similar(nodevalues(p)))
     else
         return PiecewiseLinear(nodes(p), map(similar, nodevalues(p)))
     end
+end
+
+# Arithmetic (out of place)
+for f in (:copy, :zero, :one, :conj, :transpose, :adjoint, :real, :imag, :-, :+)
+    @eval Base.$f(p::PiecewiseLinear) = PiecewiseLinear(nodes(p), map($f, nodevalues(p)))
 end
 
 function Base.:+(p1::PiecewiseLinear, p2::PiecewiseLinear)
@@ -70,6 +80,23 @@ function Base.:-(p1::PiecewiseLinear, p2::PiecewiseLinear)
     return PiecewiseLinear(nodes(p1), nodevalues(p1) .- nodevalues(p2))
 end
 
+function Base.:*(α::Const, p::PiecewiseLinear)
+    return PiecewiseLinear(nodes(p), (α,) .* nodevalues(p))
+end
+
+function Base.:*(p::PiecewiseLinear, α::Const)
+    return PiecewiseLinear(nodes(p), nodevalues(p) .* (α,))
+end
+
+function Base.:\(α::Const, p::PiecewiseLinear)
+    return PiecewiseLinear(nodes(p), (α,) .\ nodevalues(p))
+end
+
+function Base.:/(p::PiecewiseLinear, α::Const)
+    return PiecewiseLinear(nodes(p), nodevalues(p) ./ (α,))
+end
+
+# Arithmetic (in place / mutating methods)
 function LinearAlgebra.rmul!(p::PiecewiseLinear, α)
     rmul!(p.values, α)
     return p
@@ -147,4 +174,20 @@ function LinearAlgebra.axpby!(α, px::PiecewiseLinear, β, py::PiecewiseLinearAr
         axpby!(α, vx, β, vy)
     end
     return py
+end
+
+function LinearAlgebra.dot(p1::PiecewiseLinear, p2::PiecewiseLinear)
+    @assert nodes(p1) == nodes(p2)
+    n = nodes(p1)
+    v1 = nodevalues(p1)
+    v2 = nodevalues(p2)
+    s = dot(v1[1], v2[1]) * (n[2] - n[1])/3
+    for i = 2:length(n)-1
+        s += (dot(v1[i], v2[i-1]) + dot(v1[i-1], v2[i])) * (n[i]-n[i-1])/6
+        s += dot(v1[i], v2[i]) * (n[i+1] - n[i-1])/3
+    end
+    i = length(n)
+    s += (dot(v1[i], v2[i-1]) + dot(v1[i-1], v2[i])) * (n[i]-n[i-1])/6
+    s += dot(v1[i], v2[i]) * (n[i] - n[i-1])/3
+    return s
 end

@@ -94,19 +94,31 @@ end
 
         @test CMPSKit.localgradientRs(ψ[1], Q, Rs, ρL, ρR) == (zero(Q), zero(Q))
         @test CMPSKit.localgradientRs(ψ[1]^2, Q, Rs, ρL, ρR) == (zero(Q), zero(Q))
+        @test CMPSKit.localgradient∂Rs(ψ[1]^2, Q, Rs, ρL, ρR) == (zero(Q), zero(Q))
+
         @test CMPSKit.localgradientRs(∂ψ[1], Q, Rs, ρL, ρR) == (zero(Q), zero(Q))
+        @test CMPSKit.localgradient∂Rs(∂ψ[1], Q, Rs, ρL, ρR) == (zero(Q), zero(Q))
+
         @test all(isapprox.(CMPSKit.localgradientRs(ψ[2]', Q, Rs, ρL, ρR),
                             (zero(Q), ρL*ρR)))
         @test all(isapprox.(CMPSKit.localgradientRs((ψ[2]')^2, Q, Rs, ρL, ρR),
                             (zero(Q), R2'*ρL*ρR + ρL*ρR*R2')))
+
         @test all(isapprox.(CMPSKit.localgradientRs(∂(ψ[2]'), Q, Rs, ρL, ρR),
-                            (zero(Q), Q'*ρL*ρR - ρL*ρR*Q' - ∂(ρL*ρR))))
-        @test all(isapprox.(CMPSKit.localgradientRs(∂(ψ[2]'), Q, Rs, ρL, ρR),
-                            (zero(Q), Q'*ρL*ρR - ρL*ρR*Q' - ∂(ρL*ρR))))
+                            (zero(Q), Q'*ρL*ρR - ρL*ρR*Q')))
+        @test all(isapprox.(CMPSKit.localgradient∂Rs(∂(ψ[2]'), Q, Rs, ρL, ρR),
+                            (zero(Q), ρL*ρR)))
+
         @test all(isapprox.(CMPSKit.localgradientRs((∂ψ[1])'*∂ψ[2], Q, Rs, ρL, ρR),
-                            (Q'*ρL*QR2*ρR - ρL*QR2*ρR*Q' - ∂(ρL*QR2*ρR), zero(Q))))
+                            (Q'*ρL*QR2*ρR - ρL*QR2*ρR*Q', zero(Q))))
+        @test all(isapprox.(CMPSKit.localgradient∂Rs((∂ψ[1])'*∂ψ[2], Q, Rs, ρL, ρR),
+                            (ρL*QR2*ρR, zero(Q))))
+
         @test all(isapprox.(CMPSKit.localgradientRs(ψ[1]'*ψ[2], Q, Rs, ρL, ρR),
                             (ρL*R2*ρR, zero(Q))))
+        @test all(isapprox.(CMPSKit.localgradient∂Rs(ψ[1]'*ψ[2], Q, Rs, ρL, ρR),
+                            (zero(Q), zero(Q))))
+
         @test all(isapprox.(CMPSKit.localgradientRs((ψ[1]')^2*ψ[1]^2, Q, Rs, ρL, ρR),
                             (R1'*ρL*R1*R1*ρR + ρL*R1*R1*ρR*R1', zero(Q))))
     end
@@ -138,4 +150,37 @@ end
 
     @test gradR ≈ -differentiate(ρL*𝒟R*ρR) + QL'*ρL*𝒟R*ρR - ρL*𝒟R*ρR*QL' +
                     α*ρL*RL*ρR + β*RL'*ρL*ρR + β*ρL*ρR*RL' + γ*RL'*ρL*RL*RL*ρR + γ*ρL*RL*RL*ρR*RL' + HL*RL*ρR + ρL*RL*HR
+end
+
+@testset "PeriodicCMS: test ground state algorithm" begin
+    D = 2
+    T = ComplexF64
+    α = fit(x->-1 + 0.8*sin(x), FourierSeries; Kmax = 1)
+    β = 0.
+    γ = 1.
+    H = ∫(∂ψ'*∂ψ + α*ψ'*ψ + β*(ψ*ψ + ψ'*ψ') + γ*(ψ')^2*ψ^2, (-Inf,+Inf))
+    Kmax = 10
+
+    eigalg = Arnoldi(; krylovdim = D^2*(2*Kmax+1), tol = 1e-10)
+    linalg = GMRES(; krylovdim = D^2*(2*Kmax+1), tol = 1e-10, maxiter = 1)
+    optalg = ConjugateGradient(; gradtol = 1e-7, verbosity = 2)
+
+    gradtol = 1e-7
+    optalg = LBFGS(30; verbosity = 2, gradtol = gradtol)
+    eigalg = Arnoldi(; krylovdim = 64, tol = 1e-10)
+    linalg = GMRES(; krylovdim = 64, tol = 1e-10)
+    for k = 1:3
+        A = FourierSeries([exp(-4*(j>>1))*randn(T, (D,D)) for j=1:5])
+        A = (A - A')/2
+        R = FourierSeries([exp(-4*(j>>1))*randn(T, (D,D)) for j=1:3])
+        Q = A - 1/2 * R'*R
+        Ψ = InfiniteCMPS(Q, R)
+
+        ΨL, ρR, E, e, normgrad, numfg, history =
+            groundstate(H, Ψ;
+                        optalg = optalg, eigalg = eigalg, linalg = linalg, Kmax = Kmax)
+
+        @test E ≈ -0.237009267723921
+        @test ∫(expval(ψ'*ψ, ΨL, one(ρR), ρR), (0,1)) ≈ 0.5616439424330847 atol=gradtol
+    end
 end

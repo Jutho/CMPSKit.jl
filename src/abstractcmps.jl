@@ -1,5 +1,7 @@
 abstract type AbstractCMPS{T,N} end
 
+scalartype(ψ::AbstractCMPS{T}) where T = scalartype(T)
+
 function leftreducedoperator(op::FieldOperator, Ψ::AbstractCMPS, ρL = nothing; kwargs...)
     if isnothing(ρL)
         ρL = leftenv(Ψ; kwargs...)
@@ -37,7 +39,7 @@ function leftreducedoperator(ops::LocalOperator, Ψ::AbstractCMPS, ρL = nothing
         if coeff isa Number
             axpy!(coeff, leftreducedoperator(op, Ψ, ρL), hL)
         else
-            hL += coeff * leftreducedoperator(op, Ψ, ρL)
+            mul!(hL, coeff, leftreducedoperator(op, Ψ, ρL), true, true)
         end
     end
     return hL
@@ -52,7 +54,7 @@ function rightreducedoperator(ops::LocalOperator, Ψ::AbstractCMPS, ρR = nothin
         if coeff isa Number
             axpy!(coeff, rightreducedoperator(op, Ψ, ρR), hR)
         else
-            hR += coeff * rightreducedoperator(op, Ψ, ρR)
+            mul!(hR, coeff, rightreducedoperator(op, Ψ, ρR), true, true)
         end
     end
     return hR
@@ -65,8 +67,23 @@ function expval(ops::LocalOperator, Ψ::AbstractCMPS, ρL = nothing, ρR = nothi
     if isnothing(ρR)
         ρR, = rightenv(Ψ; kwargs...)
     end
-    Z = real(dot(ρL, ρR))
-    ev = sum(coeff*_expval(op, Ψ.Q, Ψ.Rs, ρL, ρR)
-                for (coeff, op) in zip(coefficients(ops), operators(ops)))
+    (a, b) = domain(Ψ)
+    if !isfinite(a)
+        a = zero(a)
+    end
+    if !isfinite(b)
+        b = oneunit(b)
+    end
+    ZL = localdot(ρL, ρR)
+    Z = real(ZL(a))
+    Zb = ZL(b)
+    Z ≈ Zb || @warn "error in computing normalisation: Za = $Z, Zb = $Zb"
+    evs = _expval.(operators(ops), Ref(Ψ.Q), Ref(Ψ.Rs), Ref(ρL), Ref(ρR))
+    ev = sum(coefficients(ops) .* evs)
     return ev/Z
+end
+
+function expval(H::LocalHamiltonian, Ψ::AbstractCMPS, ρL = nothing, ρR = nothing; kwargs...)
+    @assert domain(H) == domain(Ψ)
+    return integrate(expval(H.h, Ψ, ρL, ρR; kwargs...), domain(H))
 end

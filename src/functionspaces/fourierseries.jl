@@ -1,5 +1,5 @@
 # Type definition
-struct FourierSeries{T,S<:Real} <: FunctionSpace{T}
+struct FourierSeries{T,S<:Real} <: FunctionSeries{T}
     coeffs::Vector{T}
     period::S
     function FourierSeries(coeffs::Vector{T}, period=1) where {T}
@@ -14,292 +14,256 @@ end
 period(f::FourierSeries) = f.period
 domain(f::FourierSeries) = (zero(period(f)), period(f))
 
-nummodes(F::FourierSeries) = (length(F.coeffs)-1) >> 1
-coefficients(F::FourierSeries) = F.coeffs
+nummodes(f::FourierSeries) = (length(f.coeffs)-1) >> 1
+coefficients(f::FourierSeries) = f.coeffs
 
-function Base.:(==)(F1::FourierSeries, F2::FourierSeries)
-    F1.period == F2.period || return false
-    K = max(nummodes(F1), nummodes(F2))
+function Base.:(==)(f1::FourierSeries, f2::FourierSeries)
+    period(f1) == period(f2) || return false
+    K = max(nummodes(f1), nummodes(f2))
     for k = -K:K
-        F1[k] == F2[k] || return false
+        f1[k] == f2[k] || return false
     end
     return true
 end
 
 # Indexing, getting and setting coefficients
-Base.eachindex(F::FourierSeries) = UnitRange(-nummodes(F), nummodes(F))
-function Base.getindex(F::FourierSeries, k)
-    if abs(k) > nummodes(F)
-        return zero(F.coeffs[1])
+Base.eachindex(f::FourierSeries) = UnitRange(-nummodes(f), nummodes(f))
+function Base.getindex(f::FourierSeries, k)
+    @inbounds if abs(k) > nummodes(f)
+        return zero(f.coeffs[1])
     else
         j = ifelse(k == 0, 1, ifelse(k < 0, -2*k+1, 2*k))
-        @inbounds getindex(F.coeffs, j)
+        return f.coeffs[j]
     end
 end
-function Base.setindex!(F::FourierSeries, v, k)
-    if abs(k) > nummodes(F)
-        setnummodes!(F, abs(k))
+function Base.setindex!(f::FourierSeries, v, k)
+    if abs(k) > nummodes(f)
+        setnummodes!(f, abs(k))
     end
     j = ifelse(k == 0, 1, ifelse(k < 0, -2*k+1, 2*k))
-    @inbounds setindex!(F.coeffs, v, j)
+    @inbounds setindex!(f.coeffs, v, j)
 end
 
 # Use as function
-function (F::FourierSeries)(x)
-    xred = x/period(F)
+function (f::FourierSeries)(x̃)
+    xred = x̃/period(f)
     x = mod1(xred, one(xred))
-    K = nummodes(F)
+    K = nummodes(f)
     factor = 2pi
-    f = zero(F[0]) + F[0]*(cos(0*factor)+im*sin(0*factor)) # for type stability
+    s, c = sincos(factor*0*x)
+    v = zero(f[0]) + f[0]*(c+im*s) # for type stability
     for k = 1:K
-        f += (F[k]+F[-k])*cos(factor*k*x) + im*(F[k]-F[-k])*sin(factor*k*x)
+        s, c = sincos(factor*k*x)
+        v += (f[k]+f[-k])*c + im*(f[k]-f[-k])*s
+    end
+    return v
+end
+
+# Change number of coefficients
+function truncate!(f::FourierSeries; Kmax::Integer = nummodes(f), tol::Real = 0)
+    Ktol = findlast(x->(norm(x) >= tol), f.coeffs)
+    Kmax = min(Kmax, Ktol === nothing ? 0 : Ktol>>1)
+    if Kmax < nummodes(f)
+        resize!(f.coeffs, 2*Kmax+1)
     end
     return f
 end
 
-# Change number of coefficients
-function truncate!(F::FourierSeries; Kmax::Integer = nummodes(F), tol::Real = 0)
-    Ktol = findlast(x->norm(x)>=tol, F.coeffs)
-    Kmax = min(Kmax, Ktol === nothing ? 0 : Ktol>>1)
-    if Kmax < nummodes(F)
-        resize!(F.coeffs, 2*Kmax+1)
+function setnummodes!(f::FourierSeries, K::Int)
+    while nummodes(f) < K
+        push!(f.coeffs, zero(f.coeffs[1]), zero(f.coeffs[1]))
     end
-    return F
+    if nummodes(f) > K
+        resize!(f.coeffs, 2*K+1)
+    end
+    return f
 end
 
-function setnummodes!(F::FourierSeries, K::Int)
-    while nummodes(F) < K
-        push!(F.coeffs, zero(F.coeffs[1]), zero(F.coeffs[1]))
-    end
-    if nummodes(F) > K
-        resize!(F.coeffs, 2*K+1)
-    end
-    return F
-end
+# Special purpose constructor
+Base.similar(f::FourierSeries, ::Type{T} = scalartype(f)) where {T} =
+    FourierSeries([zero(T)*f[0]], period(f))
 
-# special purpose constructor
-Base.similar(F::FourierSeries, ::Type{T} = scalartype(F)) where {T} =
-    FourierSeries([zero(T)*F[0]], period(F))
-
-Base.zero(F::FourierSeries) = FourierSeries([zero(F[0])], period(F))
-Base.one(F::FourierSeries) = FourierSeries([one(F[0])], period(F))
+Base.zero(f::FourierSeries) = FourierSeries([zero(f[0])], period(f))
+Base.one(f::FourierSeries) = FourierSeries([one(f[0])], period(f))
 
 # Arithmetic (out of place)
-Base.copy(F::FourierSeries) = FourierSeries(copy.(coefficients(F)), period(F))
+Base.copy(f::FourierSeries) = FourierSeries(copy.(coefficients(f)), period(f))
 
-Base.:-(F::FourierSeries) = FourierSeries(.-coefficients(F), period(F))
-Base.:+(F::FourierSeries) = FourierSeries(.+coefficients(F), period(F))
+Base.:-(f::FourierSeries) = FourierSeries(.-coefficients(f), period(f))
+Base.:+(f::FourierSeries) = FourierSeries(.+coefficients(f), period(f))
 
-const Const = Union{Number,AbstractArray}
-Base.:*(F::FourierSeries, a::Const) =
-    FourierSeries([f*a for f in coefficients(F)], period(F))
-Base.:*(a::Const, F::FourierSeries) =
-    FourierSeries([a*f for f in coefficients(F)], period(F))
-Base.:/(F::FourierSeries, a::Const) =
-    FourierSeries([f/a for f in coefficients(F)], period(F))
-Base.:\(a::Const, F::FourierSeries) =
-    FourierSeries([a\f for f in coefficients(F)], period(F))
+Base.:*(f::FourierSeries, a::Const) =
+    FourierSeries([c*a for c in coefficients(f)], period(f))
+Base.:*(a::Const, f::FourierSeries) =
+    FourierSeries([a*c for c in coefficients(f)], period(f))
+Base.:/(f::FourierSeries, a::Const) =
+    FourierSeries([c/a for c in coefficients(f)], period(f))
+Base.:\(a::Const, f::FourierSeries) =
+    FourierSeries([a\c for c in coefficients(f)], period(f))
 
-function Base.:+(F1::FourierSeries, F2::FourierSeries)
-    domain(F1) == domain(F2) || throw(DomainMismatch())
-    K1 = nummodes(F1)
-    K2 = nummodes(F2)
+function Base.:+(f1::FourierSeries, f2::FourierSeries)
+    domain(f1) == domain(f2) || throw(DomainMismatch())
+    K1 = nummodes(f1)
+    K2 = nummodes(f2)
     K = max(K1, K2)
-    F = FourierSeries(sizehint!([F1[0]+F2[0]], 2*K+1), period(F1))
+    f = FourierSeries(sizehint!([f1[0]+f2[0]], 2*K+1), period(f1))
     for k = 1:K
         if k <= K1 && k <= K2
-            F[k] = F1[k] + F2[k]
-            F[-k] = F1[-k] + F2[-k]
+            f[k] = f1[k] + f2[k]
+            f[-k] = f1[-k] + f2[-k]
         elseif k <= K1
-            F[k] = copy(F1[k])
-            F[-k] = copy(F1[-k])
+            f[k] = copy(f1[k])
+            f[-k] = copy(f1[-k])
         else
-            F[k] = copy(F2[k])
-            F[-k] = copy(F2[-k])
+            f[k] = copy(f2[k])
+            f[-k] = copy(f2[-k])
         end
     end
-    return F
+    return f
 end
 
-function Base.:-(F1::FourierSeries, F2::FourierSeries)
-    domain(F1) == domain(F2) || throw(DomainMismatch())
-    K1 = nummodes(F1)
-    K2 = nummodes(F2)
+function Base.:-(f1::FourierSeries, f2::FourierSeries)
+    domain(f1) == domain(f2) || throw(DomainMismatch())
+    K1 = nummodes(f1)
+    K2 = nummodes(f2)
     K = max(K1, K2)
-    F = FourierSeries(sizehint!([F1[0] - F2[0]], 2*K+1), period(F1))
+    f = FourierSeries(sizehint!([f1[0] - f2[0]], 2*K+1), period(f1))
     for k = 1:K
         if k <= K1 && k <= K2
-            F[k] = F1[k] - F2[k]
-            F[-k] = F1[-k] - F2[-k]
+            f[k] = f1[k] - f2[k]
+            f[-k] = f1[-k] - f2[-k]
         elseif k <= K1
-            F[k] = copy(F1[k])
-            F[-k] = copy(F1[-k])
+            f[k] = copy(f1[k])
+            f[-k] = copy(f1[-k])
         else
-            F[k] = -(F2[k])
-            F[-k] = -(F2[-k])
+            f[k] = -(f2[k])
+            f[-k] = -(f2[-k])
         end
     end
-    return F
+    return f
 end
 
-Base.:*(F1::FourierSeries, F2::FourierSeries) = truncmul(F1, F2)
+Base.:*(f1::FourierSeries, f2::FourierSeries) = truncmul(f1, f2)
 
-function truncmul(F1::FourierSeries, F2::FourierSeries;
-                    Kmax::Integer = nummodes(F1) + nummodes(F2), tol::Real = 0)
-    domain(F1) == domain(F2) || throw(DomainMismatch())
-    F = FourierSeries(sizehint!([zero(F1[0])*zero(F2[0])], 2*Kmax+1), period(F1))
-    truncmul!(F, F1, F2, true, false; Kmax = Kmax, tol = tol)
-    return F
+function truncmul(f1::FourierSeries, f2::FourierSeries;
+                    Kmax::Integer = nummodes(f1) + nummodes(f2), tol::Real = 0)
+    period(f1) == period(f2) || throw(DomainMismatch())
+    f = FourierSeries(sizehint!([zero(f1[0])*zero(f2[0])], 2*Kmax+1), period(f1))
+    truncmul!(f, f1, f2, true, false; Kmax = Kmax, tol = tol)
+    return f
 end
 
-function Base.conj(F::FourierSeries)
-    Fc = FourierSeries(map(conj, coefficients(F)), period(F))
-    K = nummodes(F)
+function Base.conj(f::FourierSeries)
+    fc = FourierSeries(map(conj, coefficients(f)), period(f))
+    K = nummodes(f)
     for k = 1:K
-        Fc[k], Fc[-k] = Fc[-k], Fc[k]
+        fc[k], fc[-k] = fc[-k], fc[k]
     end
-    return Fc
+    return fc
 end
-function Base.adjoint(F::FourierSeries)
-    Fc = FourierSeries(map(adjoint, coefficients(F)), period(F))
-    K = nummodes(F)
+function Base.adjoint(f::FourierSeries)
+    fc = FourierSeries(map(adjoint, coefficients(f)), period(f))
+    K = nummodes(f)
     for k = 1:K
-        Fc[k], Fc[-k] = Fc[-k], Fc[k]
+        fc[k], fc[-k] = fc[-k], fc[k]
     end
-    return Fc
+    return fc
 end
-Base.transpose(F::FourierSeries) = FourierSeries(map(transpose, coefficients(F)), period(F))
+Base.transpose(f::FourierSeries) = FourierSeries(map(transpose, coefficients(f)), period(f))
 
-LinearAlgebra.tr(F::FourierSeries) = FourierSeries(map(tr, coefficients(F)), period(F))
+LinearAlgebra.tr(f::FourierSeries) = FourierSeries(map(tr, coefficients(f)), period(f))
 
-Base.real(F::FourierSeries) = rmul!(F+conj(F), 1//2)
-Base.imag(F::FourierSeries) = rmul!(F-conj(F), 1//(2*im))
+Base.real(f::FourierSeries) = rmul!(f+conj(f), 1//2)
+Base.imag(f::FourierSeries) = rmul!(f-conj(f), 1//(2*im))
 
 # Arithmetic (in place / mutating methods)
-function Base.copy!(Fdst::FourierSeries, Fsrc::FourierSeries)
-    domain(Fdst) == domain(Fsrc) || throw(DomainMismatch())
-    setnummodes!(Fdst, nummodes(Fsrc))
-    if eltype(Fdst) <: Number
-        copy!(coefficients(Fdst), coefficients(Fsrc))
+function Base.copy!(fdst::FourierSeries, fsrc::FourierSeries)
+    period(fdst) == period(fsrc) || throw(DomainMismatch())
+    setnummodes!(fdst, nummodes(fsrc))
+    if eltype(fdst) <: Number
+        copy!(coefficients(fdst), coefficients(fsrc))
     else
-        for k in eachindex(Fdst)
-            copy!(Fdst[k], Fsrc[k])
+        for k in eachindex(fdst)
+            copy!(fdst[k], fsrc[k])
         end
     end
-    return Fdst
+    return fdst
 end
-function LinearAlgebra.rmul!(F::FourierSeries, α::Number)
-    if eltype(F) <: Number
-        rmul!(coefficients(F), α)
+function LinearAlgebra.rmul!(f::FourierSeries, α::Number)
+    if eltype(f) <: Number
+        rmul!(coefficients(f), α)
     else
-        for k in eachindex(F)
-            rmul!(F[k], α)
+        for k in eachindex(f)
+            rmul!(f[k], α)
         end
     end
-    return F
+    return f
 end
-function LinearAlgebra.lmul!(α::Number, F::FourierSeries)
-    if eltype(F) <: Number
-        lmul!(α, coefficients(F))
+function LinearAlgebra.lmul!(α::Number, f::FourierSeries)
+    if eltype(f) <: Number
+        lmul!(α, coefficients(f))
     else
-        for k in eachindex(F)
-            lmul!(α, F[k])
+        for k in eachindex(f)
+            lmul!(α, f[k])
         end
     end
-    return F
+    return f
 end
 
-function LinearAlgebra.axpy!(α::Number, Fx::FourierSeries, Fy::FourierSeries)
-    domain(Fx) == domain(Fy) || throw(DomainMismatch())
-    Kx = nummodes(Fx)
-    setnummodes!(Fy, max(Kx, nummodes(Fy)))
-    Ky = nummodes(Fy)
-    if eltype(Fy) <: Number
+LinearAlgebra.axpy!(α::Number, fx::FourierSeries, fy::FourierSeries) =
+    truncadd!(fy, fx, α)
+LinearAlgebra.axpby!(α::Number, fx::FourierSeries, β::Number, fy::FourierSeries) =
+    truncadd!(fy, fx, α, β)
+LinearAlgebra.mul!(fy::FourierSeries, s::Number, fx::FourierSeries, α = true, β = false) =
+    truncmul!(fy, s, fx, α, β)
+LinearAlgebra.mul!(fy::FourierSeries, fx::FourierSeries, s::Number, α = true, β = false) =
+    truncmul!(fy, fx, s, α, β)
+LinearAlgebra.mul!(f::FourierSeries, f1::FourierSeries, f2::FourierSeries,
+                    α = true, β = false) = truncmul!(f, f1, f2, α, β)
+
+function truncadd!(fy::FourierSeries, fx::FourierSeries, α = true, β = true;
+                    Kmax::Integer = max(iszero(β) ? 0 : nummodes(fy), nummodes(fx)),
+                    tol::Real = 0)
+    period(fx) == period(fy) || throw(DomainMismatch())
+    Kx = nummodes(fx)
+    Ky = min(Kmax, iszero(β) ? Kx : max(Kx, nummodes(fy)))
+    setnummodes!(fy, Ky)
+    if eltype(fy) <: Number
         if Ky > Kx
-            LinearAlgebra.axpy!(α, coefficients(Fx), view(coefficients(Fy), 1:2Kx+1))
+            LinearAlgebra.axpby!(α, coefficients(fx), β, view(coefficients(fy), 1:2Kx+1))
+            lmul!(β, view(coefficients(fy), (2Kx+2):(2Ky+1)))
         else
-            LinearAlgebra.axpy!(α, coefficients(Fx), coefficients(Fy))
+            LinearAlgebra.axpby!(α, view(coefficients(fx), 1:2Ky+1), β, coefficients(fy))
         end
     else
-        K = nummodes(Fx)
-        Threads.@threads for k in -K:K
-            axpy!(α, Fx[k], Fy[k])
-        end
-    end
-    return Fy
-end
-function LinearAlgebra.axpby!(α::Number, Fx::FourierSeries, β::Number, Fy::FourierSeries)
-    domain(Fx) == domain(Fy) || throw(DomainMismatch())
-    Kx = nummodes(Fx)
-    setnummodes!(Fy, max(Kx, nummodes(Fy)))
-    Ky = nummodes(Fy)
-    if eltype(Fy) <: Number
-        if Ky > Kx
-            LinearAlgebra.axpby!(α, coefficients(Fx), β, view(coefficients(Fy), 1:2Kx+1))
-            lmul!(β, view(coefficients(Fy), (2Kx+2):(2Ky+1)))
-        else
-            LinearAlgebra.axpby!(α, coefficients(Fx), β, coefficients(Fy))
-        end
-    else
-        K = nummodes(Fy)
-        Threads.@threads for k in -K:K
+        Threads.@threads for k in -Ky:Ky
             if abs(k) <= Kx
-                axpby!(α, Fx[k], β, Fy[k])
-            else
-                lmul!(β, Fy[k])
+                axpby!(α, fx[k], β, fy[k])
+            elseif !isone(β)
+                lmul!(β, fy[k])
             end
         end
     end
-    return Fy
+    return iszero(tol) ? fy : truncate!(fy; tol = tol)
 end
 
-LinearAlgebra.mul!(Fdst::FourierSeries, α::Number, Fsrc::FourierSeries) =
-    truncmul!(Fdst, α, Fsrc)
-LinearAlgebra.mul!(Fdst::FourierSeries, Fsrc::FourierSeries, α::Number) =
-    truncmul!(Fdst, Fsrc, α)
-LinearAlgebra.mul!(F::FourierSeries, F1::FourierSeries, F2::FourierSeries,
-                    α = true, β = false) = truncmul!(F, F1, F2, α, β)
+truncmul!(fdst::FourierSeries, α₁::Number, fsrc::FourierSeries, α₂ = true, β = false;
+            kwargs...) = truncadd!(fdst, fsrc, α₁ * α₂, β; kwargs...)
+truncmul!(fdst::FourierSeries, fsrc::FourierSeries, α₁::Number, α₂ = true, β = false;
+            kwargs...) = truncadd!(fdst, fsrc, α₁ * α₂, β; kwargs...)
 
-function truncmul!(Fdst::FourierSeries, α₁::Number, Fsrc::FourierSeries,
-                    α₂ = true, β = false;
-                    Kmax::Integer = nummodes(Fsrc), tol::Real = 0)
-    α = α₁ * α₂
-    domain(Fdst) == domain(Fsrc) || throw(DomainMismatch())
-    setnummodes!(Fdst, Kmax)
-    if eltype(Fdst) <: Number
-        mul!(coefficients(Fdst), α, coefficients(Fsrc))
-    else
-        for k in eachindex(Fdst)
-            mul!(Fdst[k], α, Fsrc[k])
-        end
-    end
-    return Fdst
-end
-function truncmul!(Fdst::FourierSeries, Fsrc::FourierSeries, α₁::Number,
-                    α₂ = true, β = false;
-                    Kmax::Integer = nummodes(Fsrc), tol::Real = 0)
-    α = α₁ * α₂
-    domain(Fdst) == domain(Fsrc) || throw(DomainMismatch())
-    setnummodes!(Fdst, Kmax)
-    if eltype(Fdst) <: Number
-        mul!(coefficients(Fdst), coefficients(Fsrc), α)
-    else
-        for k in eachindex(Fdst)
-            mul!(Fdst[k], Fsrc[k], α)
-        end
-    end
-    return Fdst
-end
-function truncmul!(F::FourierSeries, F1::FourierSeries, F2::FourierSeries,
+function truncmul!(f::FourierSeries, f1::FourierSeries, f2::FourierSeries,
                     α = true, β = false;
-                    Kmax::Integer = max(nummodes(F), nummodes(F1)+nummodes(F2)), tol::Real = 0)
-    domain(F) == domain(F1) == domain(F2) || throw(DomainMismatch())
-    K1 = nummodes(F1)
-    K2 = nummodes(F2)
-    K = min(Kmax, max(iszero(β) ? 0 : nummodes(F), K1+K2))
-    setnummodes!(F, K)
+                    Kmax::Integer = max(iszero(β) ? 0 : nummodes(f),
+                                                        nummodes(f1)+nummodes(f2)),
+                    tol::Real = 0)
+    period(f) == period(f1) == period(f2) || throw(DomainMismatch())
+    K1 = nummodes(f1)
+    K2 = nummodes(f2)
+    K = min(Kmax, max(iszero(β) ? 0 : nummodes(f), K1+K2))
+    setnummodes!(f, K)
     Threads.@threads for k = -K:K
-        fk = F[k]
+        fk = f[k]
         if fk isa AbstractArray
             T = eltype(fk)
             if β == 0
@@ -309,8 +273,8 @@ function truncmul!(F::FourierSeries, F1::FourierSeries, F2::FourierSeries,
             end
             for k1 = max(-K1, k-K2):min(K1, k+K2)
                 k2 = k - k1
-                fk1 = F1[k1]
-                fk2 = F2[k2]
+                fk1 = f1[k1]
+                fk2 = f2[k2]
                 if fk1 isa AbstractArray && fk2 isa AbstractArray
                     mul!(fk, fk1, fk2, T(α), T(true))
                 elseif fk1 isa AbstractArray
@@ -326,43 +290,40 @@ function truncmul!(F::FourierSeries, F1::FourierSeries, F2::FourierSeries,
             fk *= β
             for k1 = max(-K1, k-K2):min(K1, k+K2)
                 k2 = k - k1
-                fk1 = F1[k1]
-                fk2 = F2[k2]
+                fk1 = f1[k1]
+                fk2 = f2[k2]
                 fk += fk1*fk2*α
             end
-            F[k] = fk
+            f[k] = fk
         end
     end
-    if tol != 0
-        truncate!(F; tol = tol)
-    end
-    return F
+    return iszero(tol) ? f : truncate!(f; tol = tol)
 end
 
 # Inner product and norm
-function localdot(F1::FourierSeries, F2::FourierSeries)
-    domain(F1) == domain(F2) || throw(DomainMismatch())
-    K1 = nummodes(F1)
-    K2 = nummodes(F2)
+function localdot(f1::FourierSeries, f2::FourierSeries)
+    period(f1) == period(f2) || throw(DomainMismatch())
+    K1 = nummodes(f1)
+    K2 = nummodes(f2)
     K = K1+K2
-    F = FourierSeries(sizehint!([zero(dot(F1[0], F2[0]))], 2*K+1), period(F1))
+    f = FourierSeries(sizehint!([zero(dot(f1[0], f2[0]))], 2*K+1), period(f1))
     for k = -K:K
-        fk = F[k]
+        fk = f[k]
         for k1 = max(-K1, -K2-k):min(K1, K2-k)
             k2 = k + k1
-            fk += dot(F1[k1], F2[k2])
+            fk += dot(f1[k1], f2[k2])
         end
-        F[k] = fk
+        f[k] = fk
     end
-    return F
+    return f
 end
 
-function LinearAlgebra.dot(F1::FourierSeries, F2::FourierSeries)
-    domain(F1) == domain(F2) || throw(DomainMismatch())
-    K = min(nummodes(F1), nummodes(F2))
-    return sum(k->dot(F1[k], F2[k]), -K:K)
+function LinearAlgebra.dot(f1::FourierSeries, f2::FourierSeries)
+    domain(f1) == domain(f2) || throw(DomainMismatch())
+    K = min(nummodes(f1), nummodes(f2))
+    return sum(k->dot(f1[k], f2[k]), -K:K)
 end
-LinearAlgebra.norm(F::FourierSeries) = norm(norm(Fk) for Fk in coefficients(F))
+LinearAlgebra.norm(f::FourierSeries) = norm(norm(fk) for fk in coefficients(f))
 
 function LinearAlgebra.isapprox(x::FourierSeries, y::FourierSeries;
                                 atol::Real=0,
@@ -370,116 +331,48 @@ function LinearAlgebra.isapprox(x::FourierSeries, y::FourierSeries;
     return norm(x-y) <= max(atol, rtol*max(norm(x), norm(y)))
 end
 
-function differentiate(F::FourierSeries)
-    dF = 0im * F
-    ω = (2*pi)/period(F)
-    K = nummodes(F)
+# Differentiate and integrate
+function differentiate(f::FourierSeries)
+    df = 0im * f
+    ω = (2*pi)/period(f)
+    K = nummodes(f)
     for k = 1:K
-        f = im*ω*k
-        dF[-k] = -f*F[-k]
-        dF[+k] = +f*F[+k]
+        ν = im*ω*k
+        df[-k] = -ν*f[-k]
+        df[+k] = +ν*f[+k]
     end
-    return dF
+    return df
 end
-function integrate(F::FourierSeries, (a,b) = domain(F))
-    p = period(F)
+function integrate(f::FourierSeries, (a,b) = domain(F))
+    p = period(f)
     if b-a == p
-        return F[0]*p
+        return f[0]*p
     else
         error("not yet implemented")
     end
 end
 
-# Simple Fourier transform: typically not needed for large number of points, but should
-# work with matrix valued functions etc
 fit(f, ::Type{FourierSeries}, (a,b)::Tuple{Real,Real}; kwargs...) =
     fit(f, FourierSeries, b-a; kwargs...)
 
-function fit(f, ::Type{FourierSeries}, period = 1; Kmax = 10, tol = 1e-12)
+function fit(f, ::Type{FourierSeries}, period = 1; Kmax = 10, numpoints = 2*Kmax+1)
     K = Kmax
-    x = (0:2*K) * (period / (2K+1))
-    fx = map(f, x)
-    ω = 2*pi*0/period
-    integrand = exp.((-im*ω) .* x) .* fx
-    F = FourierSeries([sum(integrand)/(2K+1)], period)
-    isrealf = all(isreal, fx)
+    x = (0:(numpoints-1)) * (period / numpoints)
+    eox = exp.((im*2*pi/period) .* x)
+    coeffs = similar(eox, (numpoints, 2*Kmax+1))
+    coeffs[:, 1] .= 1
     for k = 1:Kmax
-        ω = 2*pi*k/period
-        integrand .= exp.((-im*ω) .* x) .* fx
-        F[k] = sum(integrand)/(2K+1)
-        if isrealf
-            F[-k] = conj(F[k])
-        else
-            integrand .= exp.((+im*ω) .* x) .* fx
-            F[-k] = sum(integrand)/(2K+1)
-        end
+        coeffs[:, 2*k] .= view(coeffs, :, k == 1 ? 1 : 2*k-2) .* eox
+        coeffs[:, 2*k+1] .= view(coeffs, :, 2*k-1) .* conj.(eox)
     end
-    return F
+    fx = f.(x)
+    fs = FourierSeries(pinv(coeffs)*fx, period)
+    if all(isreal, fx)
+        return real(fs)
+    else
+        return fs
+    end
 end
 
-# function Base.inv(F::FourierSeries; tol=1e-12, Kmax = 2*nummodes(F))
-#     K = nummodes(F)
-#     while true
-#         Fx = map(F, (0:2*K)/(2*K+1))
-#         Gx = map(inv, Fx)
-#         krange = vcat([0],[(-1)^iseven(l)*((l+1)>>1) for l=1:2*K])
-#         factor = -im*2*pi/(2*K+1)
-#         coeffG = let factor=factor, Gx=Gx, K = K
-#             map(krange) do k
-#                 sum(exp(factor*k*(l-1))*Gx[l] for l = 1:(2*K+1))/(2*K+1)
-#             end
-#         end
-#         G = FourierSeries(coeffG)
-#         if norm(G*F-one(G))<tol || K == Kmax
-#             return G
-#         else
-#             K = min(2*K, Kmax)
-#         end
-#     end
-# end
-#
-# function inv2(F::FourierSeries; tol = 1e-12, Kmax = 2*nummodes(F))
-#     Fi = inv(F; tol = tol, Kmax = Kmax)
-#     Fi2 = linsolve(x->setnummodes!(x*F, nummodes(x)), one(F), Fi; tol = tol)
-#
-#     K = nummodes(F)
-#     while true
-#         Fx = map(F, (0:2*K)/(2*K+1))
-#         Gx = map(inv, Fx)
-#         krange = vcat([0],[(-1)^iseven(l)*((l+1)>>1) for l=1:2*K])
-#         factor = -im*2*pi/(2*K+1)
-#         coeffG = let factor=factor, Gx=Gx, K = K
-#             map(krange) do k
-#                 sum(exp(factor*k*(l-1))*Gx[l] for l = 1:(2*K+1))/(2*K+1)
-#             end
-#         end
-#         G = FourierSeries(coeffG)
-#         if norm(G*F-one(G))<tol || K == Kmax
-#             return G
-#         else
-#             K = min(2*K, Kmax)
-#         end
-#     end
-#     return Fi2
-# end
-#
-# function Base.sqrt(F::FourierSeries; tol=1e-12, Kmax = 200)
-#     K = nummodes(F)
-#     while true
-#         Fx = map(F, (0:2*K)/(2*K+1))
-#         Gx = map(sqrt, Fx)
-#         krange = vcat([0],[(-1)^iseven(l)*((l+1)>>1) for l=1:2*K])
-#         factor = -im*2*pi/(2*K+1)
-#         coeffG = let factor=factor, Gx=Gx
-#             map(krange) do k
-#                 sum(exp(factor*k*(l-1))*Gx[l] for l = 1:(2*K+1))/(2*K+1)
-#             end
-#         end
-#         G = FourierSeries(coeffG)
-#         if norm(G*G-F)<tol || K == Kmax
-#             return G
-#         else
-#             K = min(2*K, Kmax)
-#         end
-#     end
-# end
+# Inverse and square root
+# ?

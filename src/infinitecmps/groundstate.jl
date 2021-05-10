@@ -111,6 +111,7 @@ function groundstate(H::LocalHamiltonian, Ψ₀::FourierCMPS;
                         test = false,
                         kwargs...)
 
+    δ = 1
     function retract(x, d, α)
         ΨL, ρR, HL, = x
         QL = ΨL.Q
@@ -142,9 +143,9 @@ function groundstate(H::LocalHamiltonian, Ψ₀::FourierCMPS;
     transport!(v, x, d, α, xnew) = v # simplest possible transport
 
     function inner(x, d1, d2)
-        dK1, dR1 = d1
-        dK2, dR2 = d2
-        return 2*real(dot(dK1, dK2)) + 2*real(dot(dR1, dR2))
+        dK1, dRs1 = d1
+        dK2, dRs2 = d2
+        return 2*real(dot(dK1, dK2)) + 2*real(sum(dot.(dRs1, dRs2)))
     end
 
     function fg(x)
@@ -176,6 +177,21 @@ function groundstate(H::LocalHamiltonian, Ψ₀::FourierCMPS;
         return (dK1, dR1s)
     end
 
+    # TODO: make this work and test this
+    # function precondition(x, d)
+    #     ΨL, ρR, = x
+    #     dK, dRs = d
+    #     ρinv = posreginv(ρR[0], δ)
+    #     dKρinv = sylvester(inv(ρinv), inv(ρinv), dK)
+    #     return (dKρinv, dRs .* Ref(ρinv))
+    # end
+
+    function _finalize!(x, E, d, numiter)
+        normgrad2 = real(inner(x, d, d))
+        δ = max(1e-12, 1e-1*normgrad2)
+        return finalize!(x, E, d, numiter)
+    end
+
     ΨL = Ψ₀
     ρR, λ, infoR = rightenv(ΨL; kwargs...)
     ρL = one(ρR)
@@ -196,8 +212,8 @@ function groundstate(H::LocalHamiltonian, Ψ₀::FourierCMPS;
 
     x, E, grad, numfg, history =
         optimize(fg, x, optalg; retract = retract,
-                                # precondition = precondition,
-                                # finalize! = _finalize!,
+                                # precondition = precondition, # TODO
+                                finalize! = _finalize!,
                                 inner = inner, transport! = transport!,
                                 scale! = scale!, add! = add!,
                                 isometrictransport = true)

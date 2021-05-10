@@ -89,6 +89,8 @@ function _ketbrafactors(op::NormalOrderedTerm{A,A}, Q, Rs) where A
     return (x, x)
 end
 
+# Local gradients: contribution to the gradient of the partial derivatives with respect
+# to Q, R, and ∂R (the last two are treated as being independent)
 localgradientQ(op::FieldOperator, Q, Rs, ρL, ρR) = zero(Q)
 localgradientQ(op::DifferentiatedCreation{i}, Q, Rs, ρL, ρR) where {i} =
     -Rs[i]'*(ρL*ρR) + (ρL*ρR)*Rs[i]'
@@ -109,17 +111,6 @@ function localgradientRs(op::Creation{i}, Q, Rs, ρL, ρR) where i
     end
     return R̄s
 end
-function localgradientRs(op::DifferentiatedCreation{i}, Q, Rs, ρL, ρR) where {i}
-    R̄s = ntuple(length(Rs)) do n
-        R̄ = zero(ρL)
-        if n == i
-            f = ρL*ρR
-            R̄ += Q'*f - f*Q' - ∂(f)
-        end
-        R̄
-    end
-    return R̄s
-end
 function localgradientRs(op::AdjointOperator{Pairing{i,j}}, Q, Rs, ρL, ρR) where {i,j}
     R̄s = ntuple(length(Rs)) do n
         R̄ = zero(ρL)
@@ -133,7 +124,6 @@ function localgradientRs(op::AdjointOperator{Pairing{i,j}}, Q, Rs, ρL, ρR) whe
     end
     return R̄s
 end
-
 function localgradientRs(op::NormalOrderedTerm{Annihilation{i}, <:Any},
                             Q, Rs, ρL, ρR) where {i}
     f = ρL*_ketfactor(op, Q, Rs)*ρR
@@ -146,13 +136,26 @@ function localgradientRs(op::NormalOrderedTerm{Annihilation{i}, <:Any},
     end
     return R̄s
 end
-function localgradientRs(op::NormalOrderedTerm{<:DifferentiatedAnnihilation{i}, <:Any},
-                            Q, Rs, ρL, ρR) where {i}
-    f = ρL*_ketfactor(op, Q, Rs)*ρR
+
+# the following assume ∂R is independent, and only computes the gradient to R
+function localgradientRs(op::DifferentiatedCreation{i}, Q, Rs, ρL, ρR) where {i}
     R̄s = ntuple(length(Rs)) do n
         R̄ = zero(ρL)
         if n == i
-            R̄ += Q'*f - f*Q' - ∂(f)
+            f = ρL*ρR
+            R̄ += Q'*f - f*Q'
+        end
+        R̄
+    end
+    return R̄s
+end
+function localgradientRs(op::NormalOrderedTerm{<:DifferentiatedAnnihilation{i}, <:Any},
+                            Q, Rs, ρL, ρR) where {i}
+    R̄s = ntuple(length(Rs)) do n
+        R̄ = zero(ρL)
+        if n == i
+            f = ρL*_ketfactor(op, Q, Rs)*ρR
+            R̄ += Q'*f - f*Q'
         end
         return R̄
     end
@@ -172,4 +175,34 @@ function localgradientRs(op::NormalOrderedTerm{Pairing{i,j}, <:Any},
         return R̄
     end
     return R̄s
+end
+
+# it is useful to treat ∂R independently in computing the gradient,
+# for example to deal with nonsmooth functions
+const ContainsDifferentiatedCreation{i} =
+    Union{DifferentiatedCreation{i}, NormalOrderedTerm{DifferentiatedAnnihilation{i},<:Any}}
+
+localgradient∂Rs(op::FieldOperator, Q, Rs, ρL, ρR) = zero.(Rs)
+function localgradient∂Rs(op::DifferentiatedCreation{i}, Q, Rs, ρL, ρR) where i
+    ∂R̄s = ntuple(length(Rs)) do n
+        ∂R̄ = zero(ρL)
+        if n == i
+            ∂R̄ += ρL*ρR
+        end
+        ∂R̄
+    end
+    return ∂R̄s
+end
+function localgradient∂Rs(op::NormalOrderedTerm{DifferentiatedAnnihilation{i}, <:Any},
+                            Q, Rs, ρL, ρR) where {i}
+
+    ∂R̄s = ntuple(length(Rs)) do n
+        if n == i
+            ∂R̄ = ρL*_ketfactor(op, Q, Rs)*ρR
+        else
+            ∂R̄ = zero(ρL)
+        end
+        ∂R̄
+    end
+    return ∂R̄s
 end

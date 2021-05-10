@@ -6,6 +6,7 @@ defaulteigalg(Ψ::FourierCMPS) =
 defaultlinalg(Ψ::FourierCMPS) =
     GMRES(; krylovdim = min(256, (10*nummodes(Ψ.Q)+1)*virtualdim(Ψ)^2))
 
+# CMPS environements
 function leftenv(Ψ::InfiniteCMPS, ρ₀ = one(Ψ.Q);
                     eigalg = defaulteigalg(Ψ),
                     linalg = nothing, # ignored
@@ -86,6 +87,9 @@ function environments!(Ψ::InfiniteCMPS, ρL₀ = one(Ψ.Q), ρR₀ = one(Ψ.Q);
     return ρL, ρR, infoL, infoR
 end
 
+# Environments of Hamiltonian with CMPS
+const InfiniteCMPSData = Tuple{InfiniteCMPS,PeriodicMatrixFunction,PeriodicMatrixFunction}
+
 function leftenv!(H::LocalHamiltonian, Ψ::InfiniteCMPS, HL₀ = zero(Ψ.Q); kwargs...)
     domain(H) == domain(Ψ) || throw(DomainMismatch())
     ρL, ρR, infoL, infoR = environments!(Ψ; kwargs...)
@@ -97,8 +101,6 @@ function rightenv!(H::LocalHamiltonian, Ψ::InfiniteCMPS, HR₀ = zero(Ψ.Q); kw
     ρL, ρR, infoL, infoR = environments!(Ψ; kwargs...)
     return rightenv(H, (Ψ,ρL,ρR), HR₀; kwargs...)
 end
-
-const InfiniteCMPSData = Tuple{InfiniteCMPS,PeriodicMatrixFunction,PeriodicMatrixFunction}
 
 # assumes Ψ is normalized and ⟨ρL|ρR⟩ = 1
 function leftenv(H::LocalHamiltonian, Ψρs::InfiniteCMPSData, HL₀ = nothing;
@@ -120,20 +122,20 @@ function leftenv(H::LocalHamiltonian, Ψρs::InfiniteCMPSData, HL₀ = nothing;
         HL₀ = HL₀ - ρL * dot(HL₀, ρR)
     end
     let TL = LeftTransfer(Ψ)
-        HL, infoL = linsolve(hL, HL₀, linalg) do x
+        HL, infoL = linsolve(hL/norm(hL), HL₀, linalg) do x
             y = ∂(x) - TL(x; kwargs...)
             y = axpy!(dot(ρR, x), ρL, y)
             truncate!(y; tol = linalg.tol/100, kwargs...)
         end
-        HL = rmul!(HL + HL', 0.5)
-        truncate!(HL; tol = linalg.tol/100, kwargs...)
+        HL = rmul!(HL + HL', 0.5*norm(hL))
+        # truncate!(HL; tol = linalg.tol/100, kwargs...)
         res = hL - (∂(HL)-TL(HL))
         infoL = ConvergenceInfo(infoL.converged, res, norm(res), infoL.numiter, infoL.numops)
         return HL, EL, eL, hL, infoL
     end
 end
 
-function rightenv(H::LocalHamiltonian, Ψρs::InfiniteCMPSData, HR₀ = zero(Ψρs[1].Q);
+function rightenv(H::LocalHamiltonian, Ψρs::InfiniteCMPSData, HR₀ = nothing;
                     eigalg = nothing, # ignored
                     linalg = defaultlinalg(Ψρs[1]),
                     kwargs...)
@@ -146,16 +148,20 @@ function rightenv(H::LocalHamiltonian, Ψρs::InfiniteCMPSData, HR₀ = zero(Ψ�
     ER = real(dot(ρL, hR))
     hR = axpy!(-ER, ρR, hR)
 
-    HR₀ = HR₀ - ρR * dot(ρL, HR₀)
+    if isnothing(HR₀)
+        HR₀ = zero(Ψρs[1].Q)
+    else
+        HR₀ = HR₀ - ρR * dot(ρL, HR₀)
+    end
     let TR = RightTransfer(Ψ)
-        HR, infoR = linsolve(hR, HR₀, linalg) do x
+        HR, infoR = linsolve(hR/norm(hR), HR₀, linalg) do x
             y = -∂(x) - TR(x; kwargs...)
             y = axpy!(dot(ρL, x), ρR, y)
             truncate!(y; tol = linalg.tol/100, kwargs...)
         end
-        HR = rmul!(HR + HR', 0.5)
-        res = hR - (-∂(HR)-TR(HR))
-        truncate!(HR; tol = linalg.tol/100, kwargs...)
+        HR = rmul!(HR + HR', 0.5*norm(hR))
+        # res = hR - (-∂(HR)-TR(HR))
+        # truncate!(HR; tol = linalg.tol/100, kwargs...)
         res = hR - (-∂(HR)-TR(HR))
         infoR = ConvergenceInfo(infoR.converged, res, norm(res), infoR.numiter, infoR.numops)
         return HR, ER, eR, hR, infoR
