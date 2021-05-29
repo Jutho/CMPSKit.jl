@@ -94,8 +94,8 @@ function groundstate(H::LocalHamiltonian, Ψ₀::FiniteCMPS;
         Rs = map(R₀s) do R₀
             PiecewiseLinear(collect(R₀.nodes), copy.(R₀.values))
         end
-        vL = normalize(vL₀)
-        vR = normalize(vR₀)
+        vL = vL₀/norm(vL₀)
+        vR = vR₀/norm(vR₀)
         Ψ = FiniteCMPS(Q, Rs, vL, vR)
         HL, HR, ρL, ρR, hL, hR, E, e, infoHL, infoHR, infoρL, infoρR =
             environments!(H, Ψ; Kmax = Kmax, tol = tol)

@@ -355,7 +355,7 @@ end
 # but should work with matrix valued functions etc
 # => generality over efficiency
 function fit(f, ::Type{TaylorSeries}, domain::Tuple{Real,Real};
-                Kmax = 10, numpoints = Kmax+1, offset = domain[1])
+                Kmax = 10, numpoints = Kmax+1, offset = (domain[1]+domain[2])/2)
 
     a, b = domain
     x = range(a, stop = b, length = numpoints)

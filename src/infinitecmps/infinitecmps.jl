@@ -31,7 +31,7 @@ InfiniteCMPS(Q::T, R::T; kwargs...) where T = InfiniteCMPS(Q, (R,); kwargs...)
 domain(::InfiniteCMPS) = (-Inf, +Inf)
 period(Ψ::InfiniteCMPS) = period(Ψ.Q)
 
-scalartype(::InfiniteCMPS{T}) where T = scalartype(T)
+Base.iterate(Ψ::InfiniteCMPS, args...) = iterate((Ψ.Q, Ψ.Rs), args...)
 
 Base.copy(Ψ::InfiniteCMPS) = InfiniteCMPS(copy(Ψ.Q), map(copy, Ψ.Rs); gauge = Ψ.gauge)
 

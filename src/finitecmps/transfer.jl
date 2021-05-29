@@ -1,5 +1,5 @@
 """
-    lefttransfer(HL₀::Matrix, hL::Union{Nothing, AbstractPiecewise},
+    lefttransfer(HL₀::AbstractMatrix, hL::Union{Nothing, AbstractPiecewise},
                     Ψ₁::FiniteCMPS, Ψ₂::FiniteCMPS = Ψ₁;
                     Kmax = 50, tol = defaulttol(Ψ₁))
 
@@ -23,7 +23,7 @@ The result is given by
 and returned as `HL, converged` with `HL::Piecewise` and where `converged::Bool` is `true`
 or `false` depending on convergence up to the requested tolerance.
 """
-function lefttransfer(HL₀::Matrix, hL::Union{Nothing, AbstractPiecewise},
+function lefttransfer(HL₀::AbstractMatrix, hL::Union{Nothing, AbstractPiecewise},
                         Ψ₁::FiniteCMPS, Ψ₂::FiniteCMPS = Ψ₁;
                         Kmax = 50, tol = defaulttol(Ψ₁))
 
@@ -72,7 +72,7 @@ function lefttransfer(HL₀::Matrix, hL::Union{Nothing, AbstractPiecewise},
 end
 
 """
-    righttransfer(HR₀::Matrix, hR::Union{Nothing, AbstractPiecewise},
+    righttransfer(HR₀::AbstractMatrix, hR::Union{Nothing, AbstractPiecewise},
                     Ψ₁::FiniteCMPS, Ψ₂::FiniteCMPS = Ψ₁;
                     Kmax = 50, tol = defaulttol(Ψ₁))
 
@@ -96,7 +96,7 @@ The result is given by
 and returned as `HL, converged` with `HL::Piecewise` and where `converged::Bool` is `true`
 or `false` depending on convergence up to the requested tolerance.
 """
-function righttransfer(HR₀::Matrix, hR::Union{Nothing, AbstractPiecewise},
+function righttransfer(HR₀::AbstractMatrix, hR::Union{Nothing, AbstractPiecewise},
                         Ψ₁::FiniteCMPS, Ψ₂::FiniteCMPS = Ψ₁;
                         Kmax = 50, tol = defaulttol(Ψ₁))
 

@@ -100,7 +100,7 @@ function groundstate(H::LocalHamiltonian, Ψ₀::UniformCMPS;
                                 isometrictransport = true)
     (ΨL, ρR, HL, E, e, hL) = x
     normgrad = sqrt(inner(x, grad, grad))
-    return ΨL, ρR, E, e, normgrad, numfg, history
+    return ΨL, one(ρR), ρR, E, e, normgrad, numfg, history
 end
 
 function groundstate(H::LocalHamiltonian, Ψ₀::FourierCMPS;
@@ -219,5 +219,5 @@ function groundstate(H::LocalHamiltonian, Ψ₀::FourierCMPS;
                                 isometrictransport = true)
     (ΨL, ρR, HL, E, e, hL) = x
     normgrad = sqrt(inner(x, grad, grad))
-    return ΨL, ρR, E, e, normgrad, numfg, history
+    return ΨL, one(ρR), ρR, E, e, normgrad, numfg, history
 end
