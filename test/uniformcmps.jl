@@ -7,8 +7,8 @@ constant2(x) = FourierSeries([x])
     for constant in (constant1, constant2)
         for T in (Float64, ComplexF64)
             Q = constant(randn(T, (D,D)))
-            R1 = constant(randn(T, (D,D)))
-            R2 = constant(randn(T, (D,D)))
+            R1 = constant(randn(T, (D,D))/D)
+            R2 = constant(randn(T, (D,D))/D)
             Ψ = InfiniteCMPS(Q, (R1,R2))
             ρL, λL, infoL = leftenv(Ψ)
             TL = LeftTransfer(Ψ)
@@ -46,7 +46,7 @@ constant2(x) = FourierSeries([x])
             @test norm(RightTransfer(Ψn)(ρR2)) <= 1e-9
 
             if constant == constant1 # actual UniformCMPS
-                ΨL,λ,CL,info = leftgauge(Ψ)
+                ΨL, λ, CL, info = leftgauge(Ψ)
                 @test λ ≈ λL
                 @test CL'*CL ≈ ρL/tr(ρL[])
                 QL = ΨL.Q
@@ -71,11 +71,11 @@ constant2(x) = FourierSeries([x])
 end
 
 @testset "UniformCMPS: energy environments with bond dimension $D" for D in Dlist
-    H = ∫(∂ψ'*∂ψ - 0.5*ψ'*ψ + 0.3*(ψ*ψ + ψ'*ψ') + 2.5*(ψ')^2*ψ^2, (-Inf,+Inf))
+    H = ∫(∂ψ̂'*∂ψ̂ - 0.5*ψ̂'*ψ̂ + 0.3*(ψ̂*ψ̂ + ψ̂'*ψ̂') + 2.5*(ψ̂')^2*ψ̂^2, (-Inf,+Inf))
     for constant in (constant1, constant2)
         for T in (Float64, ComplexF64)
             Q = constant(randn(T, (D,D)))
-            R = constant(randn(T, (D,D)))
+            R = constant(randn(T, (D,D))/D)
             Ψ = InfiniteCMPS(Q, R)
 
             ρL, ρR = environments!(Ψ)
@@ -97,8 +97,8 @@ end
     for constant in (constant1, constant2)
         for T in (Float64, ComplexF64)
             Q = constant(randn(T, (D,D)))
-            R1 = constant(randn(T, (D,D)))
-            R2 = constant(randn(T, (D,D)))
+            R1 = constant(randn(T, (D,D))/D)
+            R2 = constant(randn(T, (D,D))/D)
             ρL = constant(randn(T, (D,D)))
             ρL = (ρL + ρL')/2 # does not need to be the actual ρL for this test
             ρR = constant(randn(T, (D,D)))
@@ -108,45 +108,45 @@ end
             QR1 = Q*R1 - R1*Q
             QR2 = Q*R2 - R2*Q
 
-            @test CMPSKit.localgradientQ(ψ[1], Q, Rs, ρL, ρR) == zero(Q)
-            @test CMPSKit.localgradientQ(ψ[1]^2, Q, Rs, ρL, ρR) == zero(Q)
-            @test CMPSKit.localgradientQ(∂ψ[1], Q, Rs, ρL, ρR) == zero(Q)
-            @test CMPSKit.localgradientQ(ψ[2]', Q, Rs, ρL, ρR) == zero(Q)
-            @test CMPSKit.localgradientQ((ψ[2]')^2, Q, Rs, ρL, ρR) == zero(Q)
-            @test CMPSKit.localgradientQ(∂(ψ[2]'), Q, Rs, ρL, ρR) ≈ ρL*ρR*R2' - R2'*ρL*ρR
-            @test CMPSKit.localgradientQ((∂ψ[1])'*∂ψ[2], Q, Rs, ρL, ρR) ≈
+            @test CMPSKit.localgradientQ(ψ̂[1], Q, Rs, ρL, ρR) == zero(Q)
+            @test CMPSKit.localgradientQ(ψ̂[1]^2, Q, Rs, ρL, ρR) == zero(Q)
+            @test CMPSKit.localgradientQ(∂ψ̂[1], Q, Rs, ρL, ρR) == zero(Q)
+            @test CMPSKit.localgradientQ(ψ̂[2]', Q, Rs, ρL, ρR) == zero(Q)
+            @test CMPSKit.localgradientQ((ψ̂[2]')^2, Q, Rs, ρL, ρR) == zero(Q)
+            @test CMPSKit.localgradientQ(∂(ψ̂[2]'), Q, Rs, ρL, ρR) ≈ ρL*ρR*R2' - R2'*ρL*ρR
+            @test CMPSKit.localgradientQ((∂ψ̂[1])'*∂ψ̂[2], Q, Rs, ρL, ρR) ≈
                     ρL*QR2*ρR*R1' - R1'*ρL*QR2*ρR
-            @test CMPSKit.localgradientQ(ψ[1]'*ψ[2], Q, Rs, ρL, ρR) == zero(Q)
-            @test CMPSKit.localgradientQ((ψ[1]')^2*ψ[1]^2, Q, Rs, ρL, ρR) == zero(Q)
+            @test CMPSKit.localgradientQ(ψ̂[1]'*ψ̂[2], Q, Rs, ρL, ρR) == zero(Q)
+            @test CMPSKit.localgradientQ((ψ̂[1]')^2*ψ̂[1]^2, Q, Rs, ρL, ρR) == zero(Q)
 
-            @test CMPSKit.localgradientRs(ψ[1], Q, Rs, ρL, ρR) == (zero(Q), zero(Q))
-            @test CMPSKit.localgradientRs(ψ[1]^2, Q, Rs, ρL, ρR) == (zero(Q), zero(Q))
-            @test CMPSKit.localgradient∂Rs(ψ[1]^2, Q, Rs, ρL, ρR) == (zero(Q), zero(Q))
+            @test CMPSKit.localgradientRs(ψ̂[1], Q, Rs, ρL, ρR) == (zero(Q), zero(Q))
+            @test CMPSKit.localgradientRs(ψ̂[1]^2, Q, Rs, ρL, ρR) == (zero(Q), zero(Q))
+            @test CMPSKit.localgradient∂Rs(ψ̂[1]^2, Q, Rs, ρL, ρR) == (zero(Q), zero(Q))
 
-            @test CMPSKit.localgradientRs(∂ψ[1], Q, Rs, ρL, ρR) == (zero(Q), zero(Q))
-            @test CMPSKit.localgradient∂Rs(∂ψ[1], Q, Rs, ρL, ρR) == (zero(Q), zero(Q))
+            @test CMPSKit.localgradientRs(∂ψ̂[1], Q, Rs, ρL, ρR) == (zero(Q), zero(Q))
+            @test CMPSKit.localgradient∂Rs(∂ψ̂[1], Q, Rs, ρL, ρR) == (zero(Q), zero(Q))
 
-            @test all(isapprox.(CMPSKit.localgradientRs(ψ[2]', Q, Rs, ρL, ρR),
+            @test all(isapprox.(CMPSKit.localgradientRs(ψ̂[2]', Q, Rs, ρL, ρR),
                                 (zero(Q), ρL*ρR)))
-            @test all(isapprox.(CMPSKit.localgradientRs((ψ[2]')^2, Q, Rs, ρL, ρR),
+            @test all(isapprox.(CMPSKit.localgradientRs((ψ̂[2]')^2, Q, Rs, ρL, ρR),
                                 (zero(Q), R2'*ρL*ρR + ρL*ρR*R2')))
 
-            @test all(isapprox.(CMPSKit.localgradientRs(∂(ψ[2]'), Q, Rs, ρL, ρR),
+            @test all(isapprox.(CMPSKit.localgradientRs(∂(ψ̂[2]'), Q, Rs, ρL, ρR),
                                 (zero(Q), Q'*ρL*ρR - ρL*ρR*Q')))
-            @test all(isapprox.(CMPSKit.localgradient∂Rs(∂(ψ[2]'), Q, Rs, ρL, ρR),
+            @test all(isapprox.(CMPSKit.localgradient∂Rs(∂(ψ̂[2]'), Q, Rs, ρL, ρR),
                                 (zero(Q), ρL*ρR)))
 
-            @test all(isapprox.(CMPSKit.localgradientRs((∂ψ[1])'*∂ψ[2], Q, Rs, ρL, ρR),
+            @test all(isapprox.(CMPSKit.localgradientRs((∂ψ̂[1])'*∂ψ̂[2], Q, Rs, ρL, ρR),
                                 (Q'*ρL*QR2*ρR - ρL*QR2*ρR*Q', zero(Q))))
-            @test all(isapprox.(CMPSKit.localgradient∂Rs((∂ψ[1])'*∂ψ[2], Q, Rs, ρL, ρR),
+            @test all(isapprox.(CMPSKit.localgradient∂Rs((∂ψ̂[1])'*∂ψ̂[2], Q, Rs, ρL, ρR),
                                 (ρL*QR2*ρR, zero(Q))))
 
-            @test all(isapprox.(CMPSKit.localgradientRs(ψ[1]'*ψ[2], Q, Rs, ρL, ρR),
+            @test all(isapprox.(CMPSKit.localgradientRs(ψ̂[1]'*ψ̂[2], Q, Rs, ρL, ρR),
                                 (ρL*R2*ρR, zero(Q))))
-            @test all(isapprox.(CMPSKit.localgradient∂Rs(ψ[1]'*ψ[2], Q, Rs, ρL, ρR),
+            @test all(isapprox.(CMPSKit.localgradient∂Rs(ψ̂[1]'*ψ̂[2], Q, Rs, ρL, ρR),
                                 (zero(Q), zero(Q))))
 
-            @test all(isapprox.(CMPSKit.localgradientRs((ψ[1]')^2*ψ[1]^2, Q, Rs, ρL, ρR),
+            @test all(isapprox.(CMPSKit.localgradientRs((ψ̂[1]')^2*ψ̂[1]^2, Q, Rs, ρL, ρR),
                                 (R1'*ρL*R1*R1*ρR + ρL*R1*R1*ρR*R1', zero(Q))))
 
         end
@@ -157,10 +157,10 @@ end
     α = rand()
     β = rand()
     γ = rand()
-    H = ∫(∂ψ'*∂ψ + α*ψ'*ψ + β*(ψ*ψ + ψ'*ψ') + γ*(ψ')^2*ψ^2, (-Inf,+Inf))
+    H = ∫(∂ψ̂'*∂ψ̂ + α*ψ̂'*ψ̂ + β*(ψ̂*ψ̂ + ψ̂'*ψ̂') + γ*(ψ̂')^2*ψ̂^2, (-Inf,+Inf))
     for T in (Float64, ComplexF64)
         Q = Constant(randn(T, (D,D)))
-        R = Constant(randn(T, (D,D)))
+        R = Constant(randn(T, (D,D))/D)
 
         ΨL, = leftgauge!(InfiniteCMPS(Q, R))
         QL = ΨL.Q
@@ -189,7 +189,7 @@ end
     α = -1
     β = 1//2
     γ = float(pi)
-    H = ∫(∂ψ'*∂ψ + α*ψ'*ψ + β*(ψ*ψ + ψ'*ψ') + γ*(ψ')^2*ψ^2, (-Inf,+Inf))
+    H = ∫(∂ψ̂'*∂ψ̂ + α*ψ̂'*ψ̂ + β*(ψ̂*ψ̂ + ψ̂'*ψ̂') + γ*(ψ̂')^2*ψ̂^2, (-Inf,+Inf))
 
     gradtol = 1e-7
     optalg = ConjugateGradient(; gradtol = gradtol)
@@ -197,13 +197,13 @@ end
     linalg = GMRES(; krylovdim = 16, tol = 1e-10)
     for k = 1:3
         Q = Constant(randn(T, (D,D)))
-        R = Constant(randn(T, (D,D)))
+        R = Constant(randn(T, (D,D))/D)
 
-        ΨL, ρR, E, e, normgrad, numfg, history =
+        ΨL, ρL, ρR, E, e, normgrad, numfg, history =
             groundstate(H, InfiniteCMPS(Q, R);
                         optalg = optalg, eigalg = eigalg, linalg = linalg)
         @test E ≈ -0.43306384063961445
-        @test abs(expval(ψ, ΨL, one(ρR), ρR)(0)) < gradtol
-        @test expval(ψ'*ψ, ΨL, one(ρR), ρR)(0) ≈ 0.5086468402292694 atol=gradtol
+        @test abs(expval(ψ̂, ΨL, one(ρR), ρR)(0)) < gradtol
+        @test expval(ψ̂'*ψ̂, ΨL, one(ρR), ρR)(0) ≈ 0.5086468402292694 atol=gradtol
     end
 end

@@ -142,12 +142,6 @@ localdot(f1::Constant, f2::Constant) = Constant(dot(f1[], f2[]))
 LinearAlgebra.dot(f1::Constant, f2::Constant) = dot(f1[], f2[])
 LinearAlgebra.norm(f::Constant) = norm(f[])
 
-function LinearAlgebra.isapprox(x::Constant, y::Constant;
-                                atol::Real=0,
-                                rtol::Real=defaulttol(x[0]))
-    return norm(x-y) <= max(atol, rtol*max(norm(x), norm(y)))
-end
-
 differentiate(f::Constant) = zero(f)
 integrate(f::Constant, (a,b)::Tuple{Real,Real}) = f[]*(b-a)
 

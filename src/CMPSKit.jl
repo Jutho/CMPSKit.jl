@@ -21,7 +21,7 @@ scalartype(x::Any) = scalartype(typeof(x))
 scalartype(T::Type{<:Number}) = T
 scalartype(::Type{<:AbstractArray{T}}) where T = T
 
-defaulttol(x::Any) = eps(real(float(one(scalartype(x)))))
+defaulttol(x::Any) = eps(real(float(one(scalartype(x)))))^(2/3)
 
 isscalar(x) = false
 isscalar(x::Number) = true

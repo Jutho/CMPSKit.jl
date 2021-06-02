@@ -325,12 +325,6 @@ function LinearAlgebra.dot(f1::FourierSeries, f2::FourierSeries)
 end
 LinearAlgebra.norm(f::FourierSeries) = norm(norm(fk) for fk in coefficients(f))
 
-function LinearAlgebra.isapprox(x::FourierSeries, y::FourierSeries;
-                                atol::Real=0,
-                                rtol::Real=defaulttol(x[0]))
-    return norm(x-y) <= max(atol, rtol*max(norm(x), norm(y)))
-end
-
 # Differentiate and integrate
 function differentiate(f::FourierSeries)
     df = 0im * f

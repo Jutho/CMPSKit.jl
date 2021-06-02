@@ -25,10 +25,9 @@ Base.eltype(::Type{<:FunctionSpace{T}}) where T = T
 _rtoldefault(x, y, atol) =
     Base.rtoldefault(scalartype(eltype(x)), scalartype(eltype(y)), atol)
 
-function LinearAlgebra.isapprox(x::F, y::F;
+function LinearAlgebra.isapprox(x::FunctionSpace, y::FunctionSpace;
                                 atol::Real=0,
-                                rtol::Real=Base.rtoldefault(eltype(x), eltype(y), atol)
-                                ) where {F<:FunctionSeries}
+                                rtol::Real=_rtoldefault(eltype(x), eltype(y), atol))
     return norm(x-y) <= max(atol, rtol*max(norm(x), norm(y)))
 end
 
