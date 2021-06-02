@@ -20,13 +20,19 @@ Base.:*(o1::AdjointOperator, o2::AdjointOperator) = (o2'*o1')'
 # Single terms #
 ################
 struct Annihilation{i} <: FieldOperator end
-const ψ = Annihilation{1}()
+const ψ̂ = Annihilation{1}()
+const ψ̂₁ = Annihilation{1}()
+const ψ̂₂ = Annihilation{2}()
+const ψ̂₃ = Annihilation{3}()
 Base.@pure Base.getindex(::Annihilation{1}, i::Int) = Annihilation{i}()
 
 const Creation{i} = AdjointOperator{Annihilation{i}}
 
 struct DifferentiatedAnnihilation{i} <: FieldOperator end
-const ∂ψ = DifferentiatedAnnihilation{1}()
+const ∂ψ̂ = DifferentiatedAnnihilation{1}()
+const ∂ψ̂₁ = DifferentiatedAnnihilation{1}()
+const ∂ψ̂₂ = DifferentiatedAnnihilation{2}()
+const ∂ψ̂₃ = DifferentiatedAnnihilation{3}()
 Base.@pure Base.getindex(::DifferentiatedAnnihilation{1}, i::Int) =
     DifferentiatedAnnihilation{i}()
 

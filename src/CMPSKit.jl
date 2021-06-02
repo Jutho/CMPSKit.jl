@@ -10,7 +10,7 @@ export fit, differentiate, integrate, localdot, domain, period, nummodes, densit
 export leftreducedoperator, rightreducedoperator, expval, gradient, groundstate
 export groundstate2
 
-export ψ, ∂ψ, ∂, ∫
+export ∂, ∫, ψ̂, ∂ψ̂, ψ̂₁, ψ̂₂, ψ̂₃, ∂ψ̂₁, ∂ψ̂₂, ∂ψ̂₃
 
 using LinearAlgebra
 using KrylovKit
@@ -58,5 +58,9 @@ include("infinitecmps/environments.jl")
 include("infinitecmps/gauging.jl")
 include("infinitecmps/gradients.jl")
 include("infinitecmps/groundstate.jl")
+
+# Deprecations
+Base.@deprecate_binding ψ ψ̂
+Base.@deprecate_binding ∂ψ ∂ψ̂
 
 end
