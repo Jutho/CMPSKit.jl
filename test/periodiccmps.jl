@@ -176,7 +176,7 @@ end
         Q = A - 1/2 * R'*R
         Ψ = InfiniteCMPS(Q, R)
 
-        ΨL, ρL, ρR, R, E, e, normgrad, numfg, history =
+        ΨL, ρL, ρR, E, e, normgrad, numfg, history =
             groundstate(H, Ψ;
                         optalg = optalg, eigalg = eigalg, linalg = linalg, Kmax = Kmax)
 

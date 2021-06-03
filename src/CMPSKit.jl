@@ -10,6 +10,8 @@ export fit, differentiate, integrate, localdot, domain, period, nummodes, densit
 export leftreducedoperator, rightreducedoperator, expval, gradient, groundstate
 export groundstate2
 
+export norm, dot, isapprox
+
 export ∂, ∫, ψ̂, ∂ψ̂, ψ̂₁, ψ̂₂, ψ̂₃, ∂ψ̂₁, ∂ψ̂₂, ∂ψ̂₃
 
 using LinearAlgebra
