@@ -19,7 +19,9 @@ Base.:*(α::ScalarFunction, op::SumOfLocalTerms) =
 Base.:*(op::SumOfLocalTerms, α::ScalarFunction) = *(α, op)
 
 Base.:-(op::LocalOperator) = SumOfLocalTerms((-1,), (op,))
+Base.:+(op::LocalOperator) = SumOfLocalTerms((+1,), (op,))
 Base.:-(op::SumOfLocalTerms) = SumOfLocalTerms(.-(op.coefficients), op.operators)
+Base.:+(op::SumOfLocalTerms) = SumOfLocalTerms(.+(op.coefficients), op.operators)
 
 Base.:+(op1::LocalOperator, op2::LocalOperator) = SumOfLocalTerms((1,1), (op1, op2))
 Base.:-(op1::LocalOperator, op2::LocalOperator) = SumOfLocalTerms((1,-1), (op1, op2))

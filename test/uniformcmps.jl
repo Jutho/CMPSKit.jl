@@ -189,10 +189,10 @@ end
     α = -1
     β = 1//2
     γ = float(pi)
-    H = ∫(∂ψ̂'*∂ψ̂ + α*ψ̂'*ψ̂ + β*(ψ̂*ψ̂ + ψ̂'*ψ̂') + γ*(ψ̂')^2*ψ̂^2, (-Inf,+Inf))
+    Ĥ = ∫(∂ψ̂'*∂ψ̂ + α*ψ̂'*ψ̂ + β*(ψ̂*ψ̂ + ψ̂'*ψ̂') + γ*(ψ̂')^2*ψ̂^2, (-Inf,+Inf))
 
     gradtol = 1e-7
-    optalg = ConjugateGradient(; gradtol = gradtol)
+    optalg = LBFGS(; gradtol = gradtol)
     eigalg = Arnoldi(; krylovdim = 16, tol = 1e-10)
     linalg = GMRES(; krylovdim = 16, tol = 1e-10)
     for k = 1:3
@@ -200,10 +200,14 @@ end
         R = Constant(randn(T, (D,D))/D)
 
         ΨL, ρL, ρR, E, e, normgrad, numfg, history =
-            groundstate(H, InfiniteCMPS(Q, R);
+            groundstate(Ĥ, InfiniteCMPS(Q, R);
                         optalg = optalg, eigalg = eigalg, linalg = linalg)
         @test E ≈ -0.43306384063961445
         @test abs(expval(ψ̂, ΨL, one(ρR), ρR)(0)) < gradtol
         @test expval(ψ̂'*ψ̂, ΨL, one(ρR), ρR)(0) ≈ 0.5086468402292694 atol=gradtol
+
+        ΨL, ρL, ρR, E, e, normgrad, numfg, history =
+            groundstate(Ĥ, InfiniteCMPS(Q, R);
+                        optalg = optalg, eigalg = eigalg, linalg = linalg)
     end
 end

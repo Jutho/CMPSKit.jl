@@ -16,6 +16,7 @@ Base.:*(α::Number, H::LocalHamiltonian) = LocalHamiltonian(α * H.h, H.domain)
 Base.:*(H::LocalHamiltonian, α::Number) = LocalHamiltonian(H.h * α, H.domain)
 Base.:\(α::Number, H::LocalHamiltonian) = LocalHamiltonian(α \ H.h, H.domain)
 Base.:/(H::LocalHamiltonian, α::Number) = LocalHamiltonian(H.h / α, H.domain)
+Base.:+(H::LocalHamiltonian) = LocalHamiltonian(+H.h, H.domain)
 Base.:-(H::LocalHamiltonian) = LocalHamiltonian(-H.h, H.domain)
 
 function Base.:+(H1::LocalHamiltonian, H2::LocalHamiltonian)
