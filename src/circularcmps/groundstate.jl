@@ -129,25 +129,19 @@ function groundstate2(Ĥ::LocalHamiltonian, Ψ₀::UniformCircularCMPS;
         ΨL = x
         QL = ΨL.Q
         RLs = ΨL.Rs
-        KL = copy(QL)
-        for R in RLs
-            mul!(KL, R', R, +1/2, 1)
-        end
 
         dRs = d
         RdR = zero(QL)
+        dRdR = zero(QL)
         for (R, dR) in zip(RLs, dRs)
             mul!(RdR, R', dR, true, true)
+            mul!(dRdR, dR', dR, true, true)
         end
 
         RLs = RLs .+ α .* dRs
-        KL = KL - (α/2) * (RdR - RdR')
-        QL = KL
-        for R in RLs
-            mul!(QL, R', R, -1/2, 1)
-        end
+        QL = QL - α * RdR - α^2/2 * dRdR
 
-        ΨL = CircularCMPS(QL, RLs, period(ΨL))
+        ΨL = normalize!(CircularCMPS(QL, RLs, period(ΨL)))
         return ΨL, d
     end
 
@@ -189,6 +183,7 @@ function groundstate2(Ĥ::LocalHamiltonian, Ψ₀::UniformCircularCMPS;
 
 
     ΨL, = leftgauge(Ψ₀; kwargs...)
+    ΨL = normalize!(ΨL)
     ℰ = real(expval(Ĥ, ΨL))
     x = ΨL
     _, d = fg(ΨL)
@@ -196,13 +191,8 @@ function groundstate2(Ĥ::LocalHamiltonian, Ψ₀::UniformCircularCMPS;
     verbosity > 0 &&
         @info @sprintf("CircularCMPS ground state: initialization with ℰ = %.12f", ℰ)
 
-    return optimtest(fg, x, (-1) .* d; alpha = 0:1e-9:1e-6, retract = retract,
-                                    inner = inner)
-
-
     x, ℰ, grad, numfg, history =
         optimize(fg, x, optalg; retract = retract,
-                                # precondition = precondition,
                                 finalize! = _finalize!,
                                 inner = inner, transport! = transport!,
                                 scale! = scale!, add! = add!,
