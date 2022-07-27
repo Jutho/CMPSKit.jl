@@ -15,9 +15,9 @@ function gradient(H::LocalHamiltonian, Ψρs::InfiniteCMPSData, HL = nothing, HR
     gradQ = zero(Q)
     for (coeff, op) in zip(coefficients(H.h), operators(H.h))
         if coeff isa Number
-            axpy!(coeff, localgradientQ(op, Q, Rs, ρL, ρR), gradQ)
+            axpy!(coeff, localgradientQ(op, Ψ, ρL, ρR), gradQ)
         else
-            mul!(gradQ, coeff, localgradientQ(op, Q, Rs, ρL, ρR), 1, 1)
+            mul!(gradQ, coeff, localgradientQ(op, Ψ, ρL, ρR), 1, 1)
         end
     end
     mul!(gradQ, HL, ρR, 1, 1)
@@ -27,15 +27,15 @@ function gradient(H::LocalHamiltonian, Ψρs::InfiniteCMPSData, HL = nothing, HR
     gradRs = zero.(Rs)
     for (coeff, op) in zip(coefficients(H.h), operators(H.h))
         if coeff isa Number
-            axpy!.(coeff, localgradientRs(op, Q, Rs, ρL, ρR), gradRs)
+            axpy!.(coeff, localgradientRs(op, Ψ, ρL, ρR), gradRs)
             if op isa ContainsDifferentiatedCreation && !(Q isa Constant)
-                grad∂Rs = localgradient∂Rs(op, Q, Rs, ρL, ρR)
+                grad∂Rs = localgradient∂Rs(op, Ψ, ρL, ρR)
                 axpy!.(-coeff, ∂.(grad∂Rs), gradRs)
             end
         else
-            mul!.(gradRs, (coeff,), localgradientRs(op, Q, Rs, ρL, ρR), 1, 1)
+            mul!.(gradRs, (coeff,), localgradientRs(op, Ψ, ρL, ρR), 1, 1)
             if op isa ContainsDifferentiatedCreation && !(Q isa Constant)
-                grad∂Rs = localgradient∂Rs(op, Q, Rs, ρL, ρR)
+                grad∂Rs = localgradient∂Rs(op, Ψ, ρL, ρR)
                 mul!.(gradRs, (-coeff,), ∂.(grad∂Rs), 1, 1)
             end
         end

@@ -1,3 +1,4 @@
+# Type definition
 # Generic implementation: arbitrary list of elements on the intervals between the nodes
 struct Piecewise{T,F<:FunctionSpace{T},S<:AbstractVector{<:Real}} <: AbstractPiecewise{T,F}
     nodes::S
@@ -92,12 +93,6 @@ function truncmul(p1::AbstractPiecewise, p2::AbstractPiecewise; kwargs...)
     return Piecewise(n, [truncmul(p1[i], p2[i]; kwargs..., dx = n[i+1]-n[i]) for i = 1:length(p1)])
 end
 
-for f in (:conj, :adjoint, :transpose, :real, :imag)
-    @eval Base.$f(p::AbstractPiecewise) = Piecewise(nodes(p), map($f, elements(p)))
-end
-
-LinearAlgebra.tr(p::AbstractPiecewise) = Piecewise(nodes(p), map(tr, elements(p)))
-
 # Arithmetic (in place / mutating methods)
 function LinearAlgebra.rmul!(p::Piecewise, α)
     for i = 1:length(p)
@@ -164,11 +159,6 @@ function LinearAlgebra.mul!(p::Piecewise, p1::AbstractPiecewise, p2::AbstractPie
 end
 
 # Inner product and norm
-function localdot(p1::AbstractPiecewise, p2::AbstractPiecewise)
-    @assert nodes(p1) == nodes(p2)
-    return Piecewise(nodes(p1), map(localdot, elements(p1), elements(p2)))
-end
-
 LinearAlgebra.dot(p1::AbstractPiecewise, p2::AbstractPiecewise) = integrate(localdot(p1, p2), domain(p1))
 
 LinearAlgebra.norm(p::AbstractPiecewise) = sqrt(dot(p, p))
@@ -183,3 +173,23 @@ function integrate(p::AbstractPiecewise, interval = domain(p))
     end
     return s
 end
+
+# Apply linear and bilinear maps locally
+map_linear(φ, p::Piecewise; kwargs...) =
+    Piecewise(nodes(p), map(f->map_linear(φ, f; kwargs...), elements(p)))
+map_antilinear(φ, p::Piecewise; kwargs...) =
+    Piecewise(nodes(p), map(f->map_antilinear(φ, f; kwargs...), elements(p)))
+function map_bilinear(φ, p₁::AbstractPiecewise, p₂::AbstractPiecewise; kwargs...)
+    nodes(p₁) == nodes(p₂) || throw(DomainMismatch())
+    els = map((f₁, f₂)->map_bilinear(φ, f₁, f₂; kwargs...), elements(p₁), elements(p₂))
+    return Piecewise(nodes(p₁), els)
+end
+function map_sesquilinear(φ, p₁::AbstractPiecewise, p₂::AbstractPiecewise; kwargs...)
+    nodes(p₁) == nodes(p₂) || throw(DomainMismatch())
+    els = map((f₁, f₂)->map_sesquilinear(φ, f₁, f₂; kwargs...), elements(p₁), elements(p₂))
+    return Piecewise(nodes(p₁), els)
+end
+
+# Base.conj(p::Piecewise) = Piecewise(nodes(p), map(conj, elements(p)))
+Base.real(p::Piecewise) = Piecewise(nodes(p), map(real, elements(p)))
+Base.imag(p::Piecewise) = Piecewise(nodes(p), map(imag, elements(p)))

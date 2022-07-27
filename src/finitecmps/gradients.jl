@@ -40,9 +40,9 @@ function _gradient(H::LocalHamiltonian, Ψρs::FiniteCMPSData, HL, HR, Z, E)
     for (coeff, op) in zip(coefficients(H.h), operators(H.h))
         if op isa ContainsDifferentiatedCreation
             if coeff isa Number
-                axpy!(coeff/Z, localgradientQ(op, Q, Rs, ρL, ρR), gradQ)
+                axpy!(coeff/Z, localgradientQ(op, Ψ, ρL, ρR), gradQ)
             else
-                mul!(gradQ, coeff, localgradientQ(op, Q, Rs, ρL, ρR), 1/Z, 1)
+                mul!(gradQ, coeff, localgradientQ(op, Ψ, ρL, ρR), 1/Z, 1)
             end
         end
     end
@@ -55,9 +55,9 @@ function _gradient(H::LocalHamiltonian, Ψρs::FiniteCMPSData, HL, HR, Z, E)
     gradRs = map(R->zero(ρL), Rs)
     for (coeff, op) in zip(coefficients(H.h), operators(H.h))
         if coeff isa Number
-            axpy!.(coeff/Z, localgradientRs(op, Q, Rs, ρL, ρR), gradRs)
+            axpy!.(coeff/Z, localgradientRs(op, Ψ, ρL, ρR), gradRs)
         else
-            mul!.(gradRs, (coeff,), localgradientRs(op, Q, Rs, ρL, ρR), 1/Z, 1)
+            mul!.(gradRs, (coeff,), localgradientRs(op, Ψ, ρL, ρR), 1/Z, 1)
         end
     end
     RρRs = Rs .* (ρR,)
@@ -69,9 +69,9 @@ function _gradient(H::LocalHamiltonian, Ψρs::FiniteCMPSData, HL, HR, Z, E)
     for (coeff, op) in zip(coefficients(H.h), operators(H.h))
         if op isa ContainsDifferentiatedCreation
             if coeff isa Number
-                axpy!.(coeff/Z, localgradient∂Rs(op, Q, Rs, ρL, ρR), grad∂Rs)
+                axpy!.(coeff/Z, localgradient∂Rs(op, Ψ, ρL, ρR), grad∂Rs)
             else
-                mul!.(grad∂Rs, (coeff,), localgradient∂Rs(op, Q, Rs, ρL, ρR), 1/Z, 1)
+                mul!.(grad∂Rs, (coeff,), localgradient∂Rs(op, Ψ, ρL, ρR), 1/Z, 1)
             end
         end
     end

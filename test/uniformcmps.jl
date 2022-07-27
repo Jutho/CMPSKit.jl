@@ -108,45 +108,48 @@ end
             QR1 = Q*R1 - R1*Q
             QR2 = Q*R2 - R2*Q
 
-            @test CMPSKit.localgradientQ(ψ̂[1], Q, Rs, ρL, ρR) == zero(Q)
-            @test CMPSKit.localgradientQ(ψ̂[1]^2, Q, Rs, ρL, ρR) == zero(Q)
-            @test CMPSKit.localgradientQ(∂ψ̂[1], Q, Rs, ρL, ρR) == zero(Q)
-            @test CMPSKit.localgradientQ(ψ̂[2]', Q, Rs, ρL, ρR) == zero(Q)
-            @test CMPSKit.localgradientQ((ψ̂[2]')^2, Q, Rs, ρL, ρR) == zero(Q)
-            @test CMPSKit.localgradientQ(∂(ψ̂[2]'), Q, Rs, ρL, ρR) ≈ ρL*ρR*R2' - R2'*ρL*ρR
-            @test CMPSKit.localgradientQ((∂ψ̂[1])'*∂ψ̂[2], Q, Rs, ρL, ρR) ≈
+            Ψ = InfiniteCMPS(Q, (R1, R2))
+
+
+            @test CMPSKit.localgradientQ(ψ̂[1], Ψ, ρL, ρR) == zero(Q)
+            @test CMPSKit.localgradientQ(ψ̂[1]^2, Ψ, ρL, ρR) == zero(Q)
+            @test CMPSKit.localgradientQ(∂ψ̂[1], Ψ, ρL, ρR) == zero(Q)
+            @test CMPSKit.localgradientQ(ψ̂[2]', Ψ, ρL, ρR) == zero(Q)
+            @test CMPSKit.localgradientQ((ψ̂[2]')^2, Ψ, ρL, ρR) == zero(Q)
+            @test CMPSKit.localgradientQ(∂(ψ̂[2]'), Ψ, ρL, ρR) ≈ ρL*ρR*R2' - R2'*ρL*ρR
+            @test CMPSKit.localgradientQ((∂ψ̂[1])'*∂ψ̂[2], Ψ, ρL, ρR) ≈
                     ρL*QR2*ρR*R1' - R1'*ρL*QR2*ρR
-            @test CMPSKit.localgradientQ(ψ̂[1]'*ψ̂[2], Q, Rs, ρL, ρR) == zero(Q)
-            @test CMPSKit.localgradientQ((ψ̂[1]')^2*ψ̂[1]^2, Q, Rs, ρL, ρR) == zero(Q)
+            @test CMPSKit.localgradientQ(ψ̂[1]'*ψ̂[2], Ψ, ρL, ρR) == zero(Q)
+            @test CMPSKit.localgradientQ((ψ̂[1]')^2*ψ̂[1]^2, Ψ, ρL, ρR) == zero(Q)
 
-            @test CMPSKit.localgradientRs(ψ̂[1], Q, Rs, ρL, ρR) == (zero(Q), zero(Q))
-            @test CMPSKit.localgradientRs(ψ̂[1]^2, Q, Rs, ρL, ρR) == (zero(Q), zero(Q))
-            @test CMPSKit.localgradient∂Rs(ψ̂[1]^2, Q, Rs, ρL, ρR) == (zero(Q), zero(Q))
+            @test CMPSKit.localgradientRs(ψ̂[1], Ψ, ρL, ρR) == (zero(Q), zero(Q))
+            @test CMPSKit.localgradientRs(ψ̂[1]^2, Ψ, ρL, ρR) == (zero(Q), zero(Q))
+            @test CMPSKit.localgradient∂Rs(ψ̂[1]^2, Ψ, ρL, ρR) == (zero(Q), zero(Q))
 
-            @test CMPSKit.localgradientRs(∂ψ̂[1], Q, Rs, ρL, ρR) == (zero(Q), zero(Q))
-            @test CMPSKit.localgradient∂Rs(∂ψ̂[1], Q, Rs, ρL, ρR) == (zero(Q), zero(Q))
+            @test CMPSKit.localgradientRs(∂ψ̂[1], Ψ, ρL, ρR) == (zero(Q), zero(Q))
+            @test CMPSKit.localgradient∂Rs(∂ψ̂[1], Ψ, ρL, ρR) == (zero(Q), zero(Q))
 
-            @test all(isapprox.(CMPSKit.localgradientRs(ψ̂[2]', Q, Rs, ρL, ρR),
+            @test all(isapprox.(CMPSKit.localgradientRs(ψ̂[2]', Ψ, ρL, ρR),
                                 (zero(Q), ρL*ρR)))
-            @test all(isapprox.(CMPSKit.localgradientRs((ψ̂[2]')^2, Q, Rs, ρL, ρR),
+            @test all(isapprox.(CMPSKit.localgradientRs((ψ̂[2]')^2, Ψ, ρL, ρR),
                                 (zero(Q), R2'*ρL*ρR + ρL*ρR*R2')))
 
-            @test all(isapprox.(CMPSKit.localgradientRs(∂(ψ̂[2]'), Q, Rs, ρL, ρR),
+            @test all(isapprox.(CMPSKit.localgradientRs(∂(ψ̂[2]'), Ψ, ρL, ρR),
                                 (zero(Q), Q'*ρL*ρR - ρL*ρR*Q')))
-            @test all(isapprox.(CMPSKit.localgradient∂Rs(∂(ψ̂[2]'), Q, Rs, ρL, ρR),
+            @test all(isapprox.(CMPSKit.localgradient∂Rs(∂(ψ̂[2]'), Ψ, ρL, ρR),
                                 (zero(Q), ρL*ρR)))
 
-            @test all(isapprox.(CMPSKit.localgradientRs((∂ψ̂[1])'*∂ψ̂[2], Q, Rs, ρL, ρR),
+            @test all(isapprox.(CMPSKit.localgradientRs((∂ψ̂[1])'*∂ψ̂[2], Ψ, ρL, ρR),
                                 (Q'*ρL*QR2*ρR - ρL*QR2*ρR*Q', zero(Q))))
-            @test all(isapprox.(CMPSKit.localgradient∂Rs((∂ψ̂[1])'*∂ψ̂[2], Q, Rs, ρL, ρR),
+            @test all(isapprox.(CMPSKit.localgradient∂Rs((∂ψ̂[1])'*∂ψ̂[2], Ψ, ρL, ρR),
                                 (ρL*QR2*ρR, zero(Q))))
 
-            @test all(isapprox.(CMPSKit.localgradientRs(ψ̂[1]'*ψ̂[2], Q, Rs, ρL, ρR),
+            @test all(isapprox.(CMPSKit.localgradientRs(ψ̂[1]'*ψ̂[2], Ψ, ρL, ρR),
                                 (ρL*R2*ρR, zero(Q))))
-            @test all(isapprox.(CMPSKit.localgradient∂Rs(ψ̂[1]'*ψ̂[2], Q, Rs, ρL, ρR),
+            @test all(isapprox.(CMPSKit.localgradient∂Rs(ψ̂[1]'*ψ̂[2], Ψ, ρL, ρR),
                                 (zero(Q), zero(Q))))
 
-            @test all(isapprox.(CMPSKit.localgradientRs((ψ̂[1]')^2*ψ̂[1]^2, Q, Rs, ρL, ρR),
+            @test all(isapprox.(CMPSKit.localgradientRs((ψ̂[1]')^2*ψ̂[1]^2, Ψ, ρL, ρR),
                                 (R1'*ρL*R1*R1*ρR + ρL*R1*R1*ρR*R1', zero(Q))))
 
         end

@@ -27,3 +27,5 @@ function Base.:-(H1::LocalHamiltonian, H2::LocalHamiltonian)
     H1.domain == H2.domain || error("non-matching domains")
     return LocalHamiltonian(H1.h - H2.h, H1.domain)
 end
+
+Base.adjoint(H::LocalHamiltonian) = LocalHamiltonian(H.h', H.domain)

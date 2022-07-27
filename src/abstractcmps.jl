@@ -2,13 +2,22 @@ abstract type AbstractCMPS{T,N} end
 
 scalartype(ψ::AbstractCMPS{T}) where T = scalartype(T)
 
-function leftreducedoperator(op::FieldOperator, Ψ::AbstractCMPS, ρL = nothing; kwargs...)
+function expval(H::LocalHamiltonian, Ψ::AbstractCMPS, args...; kwargs...)
+    @assert domain(H) == domain(Ψ)
+    return integrate(expval(H.h, Ψ, args...; kwargs...), domain(H))
+end
+
+LinearAlgebra.normalize(Ψ::AbstractCMPS) = normalize!(copy(Ψ))
+
+abstract type LinearCMPS{T,N} <: AbstractCMPS{T,N} end
+
+function leftreducedoperator(op::FieldOperator, Ψ::LinearCMPS, ρL = nothing; kwargs...)
     if isnothing(ρL)
         ρL = leftenv(Ψ; kwargs...)
     end
     _leftreducedoperator(op, Ψ.Q, Ψ.Rs, ρL)
 end
-function rightreducedoperator(op::FieldOperator, Ψ::AbstractCMPS, ρR = nothing; kwargs...)
+function rightreducedoperator(op::FieldOperator, Ψ::LinearCMPS, ρR = nothing; kwargs...)
     if isnothing(ρR)
         ρR = rightenv(Ψ; kwargs...)
     end
@@ -30,7 +39,7 @@ function _expval(op::FieldOperator, Q, Rs, ρL, ρR)
     return localdot(ρL*B, A*ρR)
 end
 
-function leftreducedoperator(ops::LocalOperator, Ψ::AbstractCMPS, ρL = nothing; kwargs...)
+function leftreducedoperator(ops::LocalOperator, Ψ::LinearCMPS, ρL = nothing; kwargs...)
     if isnothing(ρL)
         ρL, = leftenv(Ψ; kwargs...)
     end
@@ -45,7 +54,7 @@ function leftreducedoperator(ops::LocalOperator, Ψ::AbstractCMPS, ρL = nothing
     return hL
 end
 
-function rightreducedoperator(ops::LocalOperator, Ψ::AbstractCMPS, ρR = nothing; kwargs...)
+function rightreducedoperator(ops::LocalOperator, Ψ::LinearCMPS, ρR = nothing; kwargs...)
     if isnothing(ρR)
         ρR, = rightenv(Ψ; kwargs...)
     end
@@ -60,7 +69,7 @@ function rightreducedoperator(ops::LocalOperator, Ψ::AbstractCMPS, ρR = nothin
     return hR
 end
 
-function expval(ops::LocalOperator, Ψ::AbstractCMPS, ρL = nothing, ρR = nothing; kwargs...)
+function expval(ops::LocalOperator, Ψ::LinearCMPS, ρL = nothing, ρR = nothing; kwargs...)
     if isnothing(ρL)
         ρL, = leftenv(Ψ; kwargs...)
     end
@@ -83,7 +92,30 @@ function expval(ops::LocalOperator, Ψ::AbstractCMPS, ρL = nothing, ρR = nothi
     return ev/Z
 end
 
-function expval(H::LocalHamiltonian, Ψ::AbstractCMPS, ρL = nothing, ρR = nothing; kwargs...)
-    @assert domain(H) == domain(Ψ)
-    return integrate(expval(H.h, Ψ, ρL, ρR; kwargs...), domain(H))
+function localgradientQ(op::FieldOperator, Ψ::LinearCMPS, ρL = nothing, ρR = nothing; kwargs...)
+    if isnothing(ρL)
+        ρL, = leftenv(Ψ; kwargs...)
+    end
+    if isnothing(ρR)
+        ρR, = rightenv(Ψ; kwargs...)
+    end
+    return _localgradientQ(op, Ψ.Q, Ψ.Rs)(ρL * _ketfactor(op, Ψ.Q, Ψ.Rs) * ρR)
+end
+function localgradientRs(op::FieldOperator, Ψ::LinearCMPS, ρL = nothing, ρR = nothing; kwargs...)
+    if isnothing(ρL)
+        ρL, = leftenv(Ψ; kwargs...)
+    end
+    if isnothing(ρR)
+        ρR, = rightenv(Ψ; kwargs...)
+    end
+    return _localgradientRs(op, Ψ.Q, Ψ.Rs)(ρL * _ketfactor(op, Ψ.Q, Ψ.Rs) * ρR)
+end
+function localgradient∂Rs(op::FieldOperator, Ψ::LinearCMPS, ρL = nothing, ρR = nothing; kwargs...)
+    if isnothing(ρL)
+        ρL, = leftenv(Ψ; kwargs...)
+    end
+    if isnothing(ρR)
+        ρR, = rightenv(Ψ; kwargs...)
+    end
+    return _localgradient∂Rs(op, Ψ.Q, Ψ.Rs)(ρL * _ketfactor(op, Ψ.Q, Ψ.Rs) * ρR)
 end

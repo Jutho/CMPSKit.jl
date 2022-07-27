@@ -153,29 +153,6 @@ function truncmul(f1::FourierSeries, f2::FourierSeries;
     return f
 end
 
-function Base.conj(f::FourierSeries)
-    fc = FourierSeries(map(conj, coefficients(f)), period(f))
-    K = nummodes(f)
-    for k = 1:K
-        fc[k], fc[-k] = fc[-k], fc[k]
-    end
-    return fc
-end
-function Base.adjoint(f::FourierSeries)
-    fc = FourierSeries(map(adjoint, coefficients(f)), period(f))
-    K = nummodes(f)
-    for k = 1:K
-        fc[k], fc[-k] = fc[-k], fc[k]
-    end
-    return fc
-end
-Base.transpose(f::FourierSeries) = FourierSeries(map(transpose, coefficients(f)), period(f))
-
-LinearAlgebra.tr(f::FourierSeries) = FourierSeries(map(tr, coefficients(f)), period(f))
-
-Base.real(f::FourierSeries) = rmul!(f+conj(f), 1//2)
-Base.imag(f::FourierSeries) = rmul!(f-conj(f), 1//(2*im))
-
 # Arithmetic (in place / mutating methods)
 function Base.copy!(fdst::FourierSeries, fsrc::FourierSeries)
     period(fdst) == period(fsrc) || throw(DomainMismatch())
@@ -301,23 +278,6 @@ function truncmul!(f::FourierSeries, f1::FourierSeries, f2::FourierSeries,
 end
 
 # Inner product and norm
-function localdot(f1::FourierSeries, f2::FourierSeries)
-    period(f1) == period(f2) || throw(DomainMismatch())
-    K1 = nummodes(f1)
-    K2 = nummodes(f2)
-    K = K1+K2
-    f = FourierSeries(sizehint!([zero(dot(f1[0], f2[0]))], 2*K+1), period(f1))
-    for k = -K:K
-        fk = f[k]
-        for k1 = max(-K1, -K2-k):min(K1, K2-k)
-            k2 = k + k1
-            fk += dot(f1[k1], f2[k2])
-        end
-        f[k] = fk
-    end
-    return f
-end
-
 function LinearAlgebra.dot(f1::FourierSeries, f2::FourierSeries)
     domain(f1) == domain(f2) || throw(DomainMismatch())
     K = min(nummodes(f1), nummodes(f2))
@@ -346,6 +306,64 @@ function integrate(f::FourierSeries, (a,b) = domain(F))
     end
 end
 
+# Apply linear and bilinear maps locally
+function map_linear(φ, f::FourierSeries; kwargs...)
+    g = FourierSeries(map(φ, coefficients(f)), period(f))
+    return isempty(kwargs) ? g : truncate!(g; kwargs...)
+end
+function map_antilinear(φ, f::FourierSeries; kwargs...)
+    g = FourierSeries(map(φ, coefficients(f)), period(f))
+    K = nummodes(f)
+    for k = 1:K
+        g[k], g[-k] = g[-k], g[k]
+    end
+    return isempty(kwargs) ? g : truncate!(g; kwargs...)
+end
+function map_bilinear(φ, f₁::FourierSeries, f₂::FourierSeries;
+                        Kmax::Integer = nummodes(f₁) + nummodes(f₂), tol::Real = 0)
+    period(f₁) == period(f₂) || throw(DomainMismatch())
+    K₁ = nummodes(f₁)
+    K₂ = nummodes(f₂)
+    K = min(Kmax, K₁ + K₂)
+    coeffs = fill!([φ(f₁[0], f₂[0])], 2*K+1)
+    f = FourierSeries(coeffs, period(f₁))
+    for k = -K:K
+        fₖ = f[k]
+        for k₁ = max(-K₁, -K₂+k):min(K₁, K₂+k)
+            k₂ = k + k₁
+            fₖ += φ(f₁[k₁], f₂[k₂])
+        end
+        f[k] = fₖ
+    end
+    return iszero(tol) ? f : truncate!(f; tol = tol)
+end
+function map_sesquilinear(φ, f₁::FourierSeries, f₂::FourierSeries;
+                            Kmax::Integer = nummodes(f₁) + nummodes(f₂), tol::Real = 0)
+    period(f₁) == period(f₂) || throw(DomainMismatch())
+    K₁ = nummodes(f₁)
+    K₂ = nummodes(f₂)
+    K = min(Kmax, K₁ + K₂)
+    coeffs = sizehint!([φ(f₁[0], f₂[0])], 2*K+1)
+    f = FourierSeries(coeffs, period(f₁))
+    for k = -K:K
+        fₖ = f[k]
+        for k₁ = max(-K₁, -K₂-k):min(K₁, K₂-k)
+            k₂ = k + k₁
+            k₁ == k₂ == 0 && continue
+            fₖ += φ(f₁[k₁], f₂[k₂])
+        end
+        f[k] = fₖ
+    end
+    if !iszero(tol)
+        f = truncate!(f; tol = tol)
+    end
+    return f
+end
+
+Base.real(f::FourierSeries) = rmul!(f+conj(f), 1//2)
+Base.imag(f::FourierSeries) = rmul!(f-conj(f), 1//(2*im))
+
+# Fit a Fourier series:
 fit(f, ::Type{FourierSeries}, (a,b)::Tuple{Real,Real}; kwargs...) =
     fit(f, FourierSeries, b-a; kwargs...)
 

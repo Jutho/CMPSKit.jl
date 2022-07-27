@@ -71,6 +71,8 @@ Base.:*(op1::NormalOrderedTerm, op2::OnlyAnnihilators) =
 Base.:*(op1::AdjointOperator{<:OnlyAnnihilators}, op2::NormalOrderedTerm) =
     NormalOrderedTerm(op2.creators*op1', op2.annihilators)
 
+Base.adjoint(o::NormalOrderedTerm) = NormalOrderedTerm(o.annihilators, o.creators)
+
 # the factors that this operator brings down in a cMPS ket or bra
 _ketfactor(op::Annihilation{i}, Q, Rs) where {i} = Rs[i]
 function _ketfactor(op::DifferentiatedAnnihilation{i}, Q, Rs) where {i}
@@ -97,118 +99,86 @@ end
 
 # Local gradients: contribution to the gradient of the partial derivatives with respect
 # to Q, R, and ∂R (the last two are treated as being independent)
-localgradientQ(op::FieldOperator, Q, Rs, ρL, ρR) = zero(Q)
-localgradientQ(op::DifferentiatedCreation{i}, Q, Rs, ρL, ρR) where {i} =
-    -Rs[i]'*(ρL*ρR) + (ρL*ρR)*Rs[i]'
-function localgradientQ(op::NormalOrderedTerm{DifferentiatedAnnihilation{i}, <:Any},
-                            Q, Rs, ρL, ρR) where {i}
-    y = ρL*_ketfactor(op, Q, Rs)*ρR
-    return y * Rs[i]' - Rs[i]' * y
+
+# If the energy takes the form `e = tr(brafactor(op)' * y), then `_localgradientX` returns
+# a function such that `δe = tr(δX' * _localgradientX(y))` for `X` equal to `R`, `Q` or `∂R`.
+
+# For finite and infinite cMPS, `y` will always be `ρL*ketfactors(op)*ρR`.
+_localgradientRs(op::OnlyAnnihilators, Q, Rs) = y->zero.(Rs)
+function _localgradientRs(op::Creation{i}, Q, Rs) where i
+    return function (y)
+        R̄s = ntuple(length(Rs)) do n
+            R̄ = n == i ? y : zero(y)
+        end
+        return R̄s
+    end
+end
+function _localgradientRs(op::AdjointOperator{Pairing{i,j}}, Q, Rs) where {i,j}
+    return function (y)
+        R̄s = ntuple(length(Rs)) do n
+            R̄ = zero(y)
+            if n == i
+                R̄ += y*Rs[j]'
+            end
+            if n == j
+                R̄ += Rs[i]'*y
+            end
+            R̄
+        end
+        return R̄s
+    end
+end
+function _localgradientRs(op::NormalOrderedTerm{Annihilation{i}, <:Any}, Q, Rs) where {i}
+    return function (y)
+        R̄s = ntuple(length(Rs)) do n
+            R̄ = n == i ? y : zero(y)
+        end
+        return R̄s
+    end
 end
 
-localgradientRs(op::OnlyAnnihilators, Q, Rs, ρL, ρR) = zero.(Rs)
-function localgradientRs(op::Creation{i}, Q, Rs, ρL, ρR) where i
-    R̄s = ntuple(length(Rs)) do n
-        R̄ = zero(ρL)
-        if n == i
-            R̄ += ρL*ρR
-        end
-        R̄
-    end
-    return R̄s
-end
-function localgradientRs(op::AdjointOperator{Pairing{i,j}}, Q, Rs, ρL, ρR) where {i,j}
-    R̄s = ntuple(length(Rs)) do n
-        R̄ = zero(ρL)
-        if n == i
-            R̄ += ρL*ρR*Rs[j]'
-        end
-        if n == j
-            R̄ += Rs[i]'*ρL*ρR
-        end
-        R̄
-    end
-    return R̄s
-end
-function localgradientRs(op::NormalOrderedTerm{Annihilation{i}, <:Any},
-                            Q, Rs, ρL, ρR) where {i}
-    f = ρL*_ketfactor(op, Q, Rs)*ρR
-    R̄s = ntuple(length(Rs)) do n
-        R̄ = zero(f)
-        if n == i
-            R̄ += f
-        end
-        R̄
-    end
-    return R̄s
-end
-
-# the following assume ∂R is independent, and only computes the gradient to R
-function localgradientRs(op::DifferentiatedCreation{i}, Q, Rs, ρL, ρR) where {i}
-    R̄s = ntuple(length(Rs)) do n
-        R̄ = zero(ρL)
-        if n == i
-            f = ρL*ρR
-            R̄ += Q'*f - f*Q'
-        end
-        R̄
-    end
-    return R̄s
-end
-function localgradientRs(op::NormalOrderedTerm{<:DifferentiatedAnnihilation{i}, <:Any},
-                            Q, Rs, ρL, ρR) where {i}
-    R̄s = ntuple(length(Rs)) do n
-        R̄ = zero(ρL)
-        if n == i
-            f = ρL*_ketfactor(op, Q, Rs)*ρR
-            R̄ += Q'*f - f*Q'
-        end
-        return R̄
-    end
-    return R̄s
-end
-function localgradientRs(op::NormalOrderedTerm{Pairing{i,j}, <:Any},
-                            Q, Rs, ρL, ρR) where {i,j}
-    f = ρL*_ketfactor(op, Q, Rs)*ρR
-    R̄s = ntuple(length(Rs)) do n
-        R̄ = zero(ρL)
-        if n == i
-            R̄ += f*Rs[j]'
-        end
-        if n == j
-            R̄ += Rs[i]'*f
-        end
-        return R̄
-    end
-    return R̄s
-end
-
-# it is useful to treat ∂R independently in computing the gradient,
-# for example to deal with nonsmooth functions
 const ContainsDifferentiatedCreation{i} =
     Union{DifferentiatedCreation{i}, NormalOrderedTerm{DifferentiatedAnnihilation{i},<:Any}}
 
-localgradient∂Rs(op::FieldOperator, Q, Rs, ρL, ρR) = zero.(Rs)
-function localgradient∂Rs(op::DifferentiatedCreation{i}, Q, Rs, ρL, ρR) where i
-    ∂R̄s = ntuple(length(Rs)) do n
-        ∂R̄ = zero(ρL)
-        if n == i
-            ∂R̄ += ρL*ρR
+# the following assume ∂R is independent, and only computes the gradient to R
+function _localgradientRs(op::ContainsDifferentiatedCreation{i}, Q, Rs) where {i}
+    return function (y)
+        R̄s = ntuple(length(Rs)) do n
+            R̄ = n == i ? Q'*y - y*Q' : zero(y)
         end
-        ∂R̄
+        return R̄s
     end
-    return ∂R̄s
 end
-function localgradient∂Rs(op::NormalOrderedTerm{DifferentiatedAnnihilation{i}, <:Any},
-                            Q, Rs, ρL, ρR) where {i}
 
-    ∂R̄s = ntuple(length(Rs)) do n
-        if n == i
-            ∂R̄ = ρL*_ketfactor(op, Q, Rs)*ρR
-        else
-            ∂R̄ = zero(ρL)
+function _localgradientRs(op::NormalOrderedTerm{Pairing{i,j}, <:Any}, Q, Rs) where {i,j}
+    return function (y)
+        R̄s = ntuple(length(Rs)) do n
+            R̄ = zero(Rs[n])
+            if n == i
+                R̄ += y*Rs[j]'
+            end
+            if n == j
+                R̄ += Rs[i]'*y
+            end
+            return R̄
         end
-        ∂R̄
+        return R̄s
     end
-    return ∂R̄s
+end
+
+_localgradientQ(op::FieldOperator, Q, Rs) = y -> zero(Q)
+function _localgradientQ(op::ContainsDifferentiatedCreation{i}, Q, Rs) where {i}
+    return function (y)
+        -Rs[i]'*y + y*Rs[i]'
+    end
+end
+
+_localgradient∂Rs(op::FieldOperator, Q, Rs) = y -> zero.(Rs)
+function _localgradient∂Rs(op::ContainsDifferentiatedCreation{i}, Q, Rs) where i
+    return function (y)
+        ∂R̄s = ntuple(length(Rs)) do n
+            R̄ = n == i ? y : zero(y)
+        end
+        return ∂R̄s
+    end
 end

@@ -52,15 +52,6 @@ Base.:\(f1::Constant, f2::Constant) = Constant(f1[]\f2[])
 
 truncmul(f1::Constant, f2::Constant) = Constant(f1[]*f2[])
 
-Base.conj(f::Constant) = Constant(conj(f[]))
-Base.adjoint(f::Constant) = Constant(adjoint(f[]))
-Base.transpose(f::Constant) = Constant(transpose(f[]))
-
-LinearAlgebra.tr(f::Constant) = Constant(tr(f[]))
-
-Base.real(f::Constant) = Constant(real(f[]))
-Base.imag(f::Constant) = Constant(imag(f[]))
-
 # Arithmetic (in place / mutating methods)
 function Base.copy!(fdst::Constant, fsrc::Constant)
     if eltype(fdst) <: Number
@@ -137,13 +128,21 @@ function truncmul!(f::Constant, f1::Constant, f2::Constant,
 end
 
 # Inner product and norm
-localdot(f1::Constant, f2::Constant) = Constant(dot(f1[], f2[]))
-
 LinearAlgebra.dot(f1::Constant, f2::Constant) = dot(f1[], f2[])
 LinearAlgebra.norm(f::Constant) = norm(f[])
 
+# Differentiation and integration
 differentiate(f::Constant) = zero(f)
 integrate(f::Constant, (a,b)::Tuple{Real,Real}) = f[]*(b-a)
+
+# Apply linear and bilinear maps locally
+map_linear(φ, f::Constant; kwargs...) = Constant(φ(f[]))
+map_antilinear(φ, f::Constant; kwargs...) = Constant(φ(f[]))
+map_bilinear(φ, f₁::Constant, f₂::Constant; kwargs...) = Constant(φ(f₁[], f₂[]))
+map_sesquilinear(φ, f₁::Constant, f₂::Constant; kwargs...) = Constant(φ(f₁[], f₂[]))
+
+Base.real(f::Constant) = Constant(real(f[]))
+Base.imag(f::Constant) = Constant(imag(f[]))
 
 # Fit constant: take average over N points
 fit(f, ::Type{Constant}, (a,b)::Tuple{Real,Real}; numpoints = 5) =
