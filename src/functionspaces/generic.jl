@@ -45,3 +45,13 @@ end
 
 Base.eltype(t::AbstractPiecewise{T}) where {T} = eltype(T)
 Base.eltype(::Type{<:AbstractPiecewise{T}}) where {T} = eltype(T)
+
+# Some general functionality
+Base.copy(f::FunctionSpace) = map_linear(copy, f)
+Base.:+(f::FunctionSpace) = map_linear(+, f)
+Base.:-(f::FunctionSpace) = map_linear(-, f)
+Base.conj(f::FunctionSpace) = map_antilinear(conj, f)
+Base.transpose(f::FunctionSpace) = map_linear(transpose, f)
+Base.adjoint(f::FunctionSpace) = map_antilinear(adjoint, f)
+LinearAlgebra.tr(f::FunctionSpace) = map_linear(LinearAlgebra.tr, f)
+localdot(f₁::FunctionSpace, f₂::FunctionSpace) = map_sesquilinear(dot, f₁, f₂)

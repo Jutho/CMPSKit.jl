@@ -10,8 +10,8 @@ function leftenv(Ψ::FiniteCMPS{<:AbstractPiecewise}; Kmax = 50, tol = defaultto
     return ρL, λ, infoL
 end
 
-function leftenv!(Ψ; Kmax = 50, tol = defaulttol(Ψ))
-    ρL, λ, infoL = leftenv(Ψ)
+function leftenv!(Ψ::FiniteCMPS{<:AbstractPiecewise}; Kmax = 50, tol = defaulttol(Ψ))
+    ρL, λ, infoL = leftenv(Ψ; Kmax = Kmax, tol = tol)
     (a,b) = domain(Ψ)
     Ψ.Q -= λ * one(Ψ.Q)
     for i = 1:length(ρL)
@@ -41,8 +41,8 @@ function rightenv(Ψ::FiniteCMPS{<:AbstractPiecewise}; Kmax = 50, tol = defaultt
     return ρR, λ, infoR
 end
 
-function rightenv!(Ψ; Kmax = 50, tol = defaulttol(Ψ))
-    ρR, λ, infoR = rightenv(Ψ)
+function rightenv!(Ψ::FiniteCMPS{<:AbstractPiecewise}; Kmax = 50, tol = defaulttol(Ψ))
+    ρR, λ, infoR = rightenv(Ψ; Kmax = Kmax, tol = tol)
     Ψ.Q -= λ * one(Ψ.Q)
     for i = 1:length(ρR)
         xᵢ = ρR.nodes[i]

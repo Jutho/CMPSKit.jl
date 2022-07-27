@@ -12,11 +12,15 @@ struct RightTransfer{T,N}
     R₂s::NTuple{N,T}
 end
 
-LeftTransfer(ψ₁::CMPS, ψ₂::CMPS = ψ₁) where {CMPS<:AbstractCMPS} =
-    LeftTransfer(ψ₁.Q, ψ₂.Q, ψ₁.Rs, ψ₂.Rs)
+function LeftTransfer(Ψ₁::CMPS, Ψ₂::CMPS = Ψ₁) where {CMPS<:AbstractCMPS}
+    domain(Ψ₁) == domain(Ψ₂) || throw(DomainMismatch())
+    return LeftTransfer(Ψ₁.Q, Ψ₂.Q, Ψ₁.Rs, Ψ₂.Rs)
+end
 
-RightTransfer(ψ₁::CMPS, ψ₂::CMPS = ψ₁) where {CMPS<:AbstractCMPS} =
-    RightTransfer(ψ₁.Q, ψ₂.Q, ψ₁.Rs, ψ₂.Rs)
+function RightTransfer(Ψ₁::CMPS, Ψ₂::CMPS = Ψ₁) where {CMPS<:AbstractCMPS}
+    domain(Ψ₁) == domain(Ψ₂) || throw(DomainMismatch())
+    return RightTransfer(Ψ₁.Q, Ψ₂.Q, Ψ₁.Rs, Ψ₂.Rs)
+end
 
 scalartype(::Type{<:LeftTransfer{T}}) where T = scalartype(T)
 scalartype(::Type{<:RightTransfer{T}}) where T = scalartype(T)
@@ -46,4 +50,17 @@ function (TR::RightTransfer)(x; kwargs...)
         truncmul!(y, z, R₁', 1, 1; kwargs...)
     end
     return y
+end
+
+function _full(𝕋::Union{LeftTransfer,RightTransfer}; kwargs...)
+    Q₁ = 𝕋.Q₁
+    R₁s = 𝕋.R₁s
+    Q₂ = 𝕋.Q₂
+    R₂s = 𝕋.R₂s
+    T = map_bilinear(⊗, Q₁, one(Q₂))
+    T = axpy!(1, map_bilinear(⊗, one(Q₁), conj(Q₂)), T)
+    for (R₁, R₂) in zip(R₁s, R₂s)
+        T = axpy!(1, map_bilinear(⊗, R₁, conj(R₂)), T)
+    end
+    return T
 end

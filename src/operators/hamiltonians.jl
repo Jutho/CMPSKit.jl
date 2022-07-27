@@ -16,6 +16,7 @@ Base.:*(α::Number, H::LocalHamiltonian) = LocalHamiltonian(α * H.h, H.domain)
 Base.:*(H::LocalHamiltonian, α::Number) = LocalHamiltonian(H.h * α, H.domain)
 Base.:\(α::Number, H::LocalHamiltonian) = LocalHamiltonian(α \ H.h, H.domain)
 Base.:/(H::LocalHamiltonian, α::Number) = LocalHamiltonian(H.h / α, H.domain)
+Base.:+(H::LocalHamiltonian) = LocalHamiltonian(+H.h, H.domain)
 Base.:-(H::LocalHamiltonian) = LocalHamiltonian(-H.h, H.domain)
 
 function Base.:+(H1::LocalHamiltonian, H2::LocalHamiltonian)
@@ -26,3 +27,5 @@ function Base.:-(H1::LocalHamiltonian, H2::LocalHamiltonian)
     H1.domain == H2.domain || error("non-matching domains")
     return LocalHamiltonian(H1.h - H2.h, H1.domain)
 end
+
+Base.adjoint(H::LocalHamiltonian) = LocalHamiltonian(H.h', H.domain)

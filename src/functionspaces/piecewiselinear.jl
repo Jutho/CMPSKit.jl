@@ -56,7 +56,7 @@ function (P::PiecewiseLinear)(x)
     end
 end
 
-# Special purpose constructor
+# Special purpose constructors
 function Base.similar(p::PiecewiseLinear{T}) where T
     if isbitstype(T)
         return PiecewiseLinear(nodes(p), similar(nodevalues(p)))
@@ -64,9 +64,11 @@ function Base.similar(p::PiecewiseLinear{T}) where T
         return PiecewiseLinear(nodes(p), map(similar, nodevalues(p)))
     end
 end
+Base.zero(p::PiecewiseLinear) = PiecewiseLinear(nodes(p), map(zero, nodevalues(p)))
+Base.one(p::PiecewiseLinear) = PiecewiseLinear(nodes(p), map(one, nodevalues(p)))
 
 # Arithmetic (out of place)
-for f in (:copy, :zero, :one, :conj, :transpose, :adjoint, :real, :imag, :-, :+)
+for f in (:copy, :-, :+)
     @eval Base.$f(p::PiecewiseLinear) = PiecewiseLinear(nodes(p), map($f, nodevalues(p)))
 end
 
@@ -176,6 +178,7 @@ function LinearAlgebra.axpby!(α, px::PiecewiseLinear, β, py::PiecewiseLinearAr
     return py
 end
 
+# Inner product and norm
 function LinearAlgebra.dot(p1::PiecewiseLinear, p2::PiecewiseLinear)
     @assert nodes(p1) == nodes(p2)
     n = nodes(p1)

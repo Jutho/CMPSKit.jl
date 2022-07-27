@@ -1,5 +1,5 @@
-const PeriodicMatrixFunction{T} = Union{Constant{<:AbstractMatrix{T}},
-                                        FourierSeries{<:AbstractMatrix{T}}}
+const PeriodicMatrixFunction = Union{Constant{<:AbstractMatrix},
+                                        FourierSeries{<:AbstractMatrix}}
 
 # Gauges:
 # :n => no particular gauge, left and right fixed points completely generic
@@ -10,7 +10,7 @@ const PeriodicMatrixFunction{T} = Union{Constant{<:AbstractMatrix{T}},
 # :s => symmetric: left and right fixed point identical
 # :S => symmetric: left and right fixed point identical and diagonal
 
-mutable struct InfiniteCMPS{T<:PeriodicMatrixFunction,N} <: AbstractCMPS{T,N}
+mutable struct InfiniteCMPS{T<:PeriodicMatrixFunction,N} <: LinearCMPS{T,N}
     Q::T
     Rs::NTuple{N,T}
     gauge::Symbol
@@ -37,5 +37,5 @@ Base.copy(Ψ::InfiniteCMPS) = InfiniteCMPS(copy(Ψ.Q), map(copy, Ψ.Rs); gauge =
 
 virtualdim(Ψ::InfiniteCMPS) = size(Ψ.Q[0], 1)
 
-const UniformCMPS = InfiniteCMPS{<:Constant{<:AbstractMatrix}}
-const FourierCMPS = InfiniteCMPS{<:FourierSeries{<:AbstractMatrix}}
+const UniformCMPS{A<:AbstractMatrix,N} = InfiniteCMPS{<:Constant{A},N}
+const FourierCMPS{A<:AbstractMatrix,N} = InfiniteCMPS{<:FourierSeries{A},N}

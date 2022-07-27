@@ -173,15 +173,6 @@ function _truncmul(f1::TaylorSeries, f2::TaylorSeries;
     return truncmul!(f, f1, f2, true, true; Kmax = Kmax, tol = tol, dx = dx)
 end
 
-Base.conj(f::TaylorSeries) = TaylorSeries(map(conj, coefficients(f)), offset(f))
-Base.adjoint(f::TaylorSeries) = TaylorSeries(map(adjoint, coefficients(f)), offset(f))
-Base.transpose(f::TaylorSeries) = TaylorSeries(map(transpose, coefficients(f)), offset(f))
-
-LinearAlgebra.tr(f::TaylorSeries) = TaylorSeries(map(tr, coefficients(f)), offset(f))
-
-Base.real(f::TaylorSeries) = TaylorSeries(map(real, coefficients(f)), offset(f))
-Base.imag(f::TaylorSeries) = TaylorSeries(map(imag, coefficients(f)), offset(f))
-
 # Arithmetic (in place / mutating methods)
 function Base.copy!(fdst::TaylorSeries, fsrc::TaylorSeries)
     fdst.offset = offset(fsrc)
@@ -322,16 +313,8 @@ function truncmul!(F::TaylorSeries, F1::TaylorSeries, F2::TaylorSeries,
 end
 
 # Inner product and norm
-function localdot(f1::TaylorSeries, f2::TaylorSeries)
-    offset(f1) == offset(f2) || localdot(f1, shift(f2, offset(f1)))
-    K1 = degree(f1)
-    K2 = degree(f2)
-    coeffs = let K = K1 + K2
-        [sum(dot(f1[k1], f2[k-k1]) for k1 = max(0, k-K2):min(k, K1)) for k=0:K]
-    end
-    return TaylorSeries(coeffs, offset(f1))
-end
 
+# Differentiate and integrate
 function differentiate(f::TaylorSeries)
     if degree(f) >= 1
         return TaylorSeries([k*f[k] for k = 1:degree(f)], offset(f))
@@ -350,6 +333,37 @@ function integrate(f::TaylorSeries, (a,b)::Tuple{Real,Real})
     return s
 end
 
+# Apply linear and bilinear maps locally
+map_linear(φ, f::TaylorSeries) = TaylorSeries(map(φ, coefficients(f)), offset(f))
+map_antilinear(φ, f::TaylorSeries) = TaylorSeries(map(φ, coefficients(f)), offset(f))
+function map_bilinear(φ, f₁::TaylorSeries, f₂::TaylorSeries; kwargs...)
+    if offset(f₁) != offset(f₂)
+        _map_bilinear(φ, f₁, shift(f₂, offset(f₁)); kwargs...)
+    else
+        _map_bilinear(φ, f₁, f₂; kwargs...)
+    end
+end
+map_sesquilinear(φ, f₁::TaylorSeries, f₂::TaylorSeries; kwargs...) =
+    map_bilinear(φ, f₁, f₂; kwargs...)
+
+function _map_bilinear(φ, f₁::TaylorSeries, f₂::TaylorSeries;
+                        Kmax = degree(f₁) + degree(f₂), tol::Real = 0, dx = 1)
+    K = min(Kmax, degree(f₁) + degree(f₂))
+    coeffs = fill(φ(f₁[0], f₂[0]), K+1)
+    for k = 1:K
+        coeffs[k+1] = zero(coeffs[k+1])
+        for l = max(0, k-degree(f₁)):min(k, degree(f₂))
+            coeffs[k+1] += φ(f₁[k-l], f₂[l])
+        end
+    end
+    f = TaylorSeries(coeffs, offset(f₁))
+    return iszero(tol) ? f : truncate!(f; tol = tol, dx = dx)
+end
+
+Base.real(f::TaylorSeries) = TaylorSeries(map(real, coefficients(f)), offset(f))
+Base.imag(f::TaylorSeries) = TaylorSeries(map(imag, coefficients(f)), offset(f))
+
+# Fit
 # Simple Taylor series least squares fitting:
 # typically not needed for large number of points,
 # but should work with matrix valued functions etc
