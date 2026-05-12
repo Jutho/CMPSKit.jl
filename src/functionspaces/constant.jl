@@ -1,11 +1,11 @@
 # Type definition
 struct Constant{T} <: FunctionSeries{T}
     coeffs::Base.RefValue{T}
-    Constant(x::T) where T = new{T}(Ref(x))
+    Constant(x::T) where {T} = new{T}(Ref(x))
 end
 
 # Basic properties
-domain(f::Constant) = (-Inf,+Inf)
+domain(f::Constant) = (-Inf, +Inf)
 period(f::Constant) = 0
 
 coefficients(f::Constant) = f.coeffs
@@ -17,8 +17,9 @@ Base.eachindex(f::Constant) = 0:0
 Base.getindex(f::Constant) = f.coeffs[]
 Base.getindex(f::Constant, i::Integer) = iszero(i) ? getindex(f) : throw(BoundsError(f, i))
 Base.setindex!(f::Constant, v) = f.coeffs[] = v
-Base.getindex(f::Constant, v, i::Integer) =
-    iszero(i) ? setindex!(f, v) : throw(BoundsError(f, i))
+function Base.getindex(f::Constant, v, i::Integer)
+    return iszero(i) ? setindex!(f, v) : throw(BoundsError(f, i))
+end
 
 # Use as function
 (f::Constant)(x) = f[]
@@ -27,8 +28,7 @@ Base.getindex(f::Constant, v, i::Integer) =
 truncate!(f::Constant; kwargs...) = f
 
 # special purpose constructor
-Base.similar(f::Constant, ::Type{T} = scalartype(f)) where {T} =
-    Constant(zero(T)*f[])
+Base.similar(f::Constant, ::Type{T}=scalartype(f)) where {T} = Constant(zero(T) * f[])
 
 Base.zero(f::Constant) = Constant(zero(f[]))
 Base.one(f::Constant) = Constant(one(f[]))
@@ -39,18 +39,18 @@ Base.copy(f::Constant) = Constant(copy(f[]))
 Base.:-(f::Constant) = Constant(-f[])
 Base.:+(f::Constant) = Constant(+f[])
 
-Base.:*(f::Constant, a::Const) = Constant(f[]*a)
-Base.:*(a::Const, f::Constant) = Constant(a*f[])
-Base.:/(f::Constant, a::Const) = Constant(f[]/a)
-Base.:\(a::Const, f::Constant) = Constant(a\f[])
+Base.:*(f::Constant, a::Const) = Constant(f[] * a)
+Base.:*(a::Const, f::Constant) = Constant(a * f[])
+Base.:/(f::Constant, a::Const) = Constant(f[] / a)
+Base.:\(a::Const, f::Constant) = Constant(a \ f[])
 
-Base.:+(f1::Constant, f2::Constant) = Constant(f1[]+f2[])
-Base.:-(f1::Constant, f2::Constant) = Constant(f1[]-f2[])
-Base.:*(f1::Constant, f2::Constant) = Constant(f1[]*f2[])
-Base.:/(f1::Constant, f2::Constant) = Constant(f1[]/f2[])
-Base.:\(f1::Constant, f2::Constant) = Constant(f1[]\f2[])
+Base.:+(f1::Constant, f2::Constant) = Constant(f1[] + f2[])
+Base.:-(f1::Constant, f2::Constant) = Constant(f1[] - f2[])
+Base.:*(f1::Constant, f2::Constant) = Constant(f1[] * f2[])
+Base.:/(f1::Constant, f2::Constant) = Constant(f1[] / f2[])
+Base.:\(f1::Constant, f2::Constant) = Constant(f1[] \ f2[])
 
-truncmul(f1::Constant, f2::Constant) = Constant(f1[]*f2[])
+truncmul(f1::Constant, f2::Constant) = Constant(f1[] * f2[])
 
 # Arithmetic (in place / mutating methods)
 function Base.copy!(fdst::Constant, fsrc::Constant)
@@ -63,7 +63,7 @@ function Base.copy!(fdst::Constant, fsrc::Constant)
 end
 function LinearAlgebra.rmul!(f::Constant, α::Number)
     if eltype(f) <: Number || !(α isa Number)
-        f[] = f[]*α
+        f[] = f[] * α
     else
         rmul!(f[], α)
     end
@@ -71,27 +71,31 @@ function LinearAlgebra.rmul!(f::Constant, α::Number)
 end
 function LinearAlgebra.lmul!(α::Number, f::Constant)
     if eltype(f) <: Number || !(α isa Number)
-        f[] = α*f[]
+        f[] = α * f[]
     else
         lmul!(α, f[])
     end
     return f
 end
 
-LinearAlgebra.axpy!(α::Number, fx::Constant, fy::Constant) =
-    truncadd!(fy, fx, α)
-LinearAlgebra.axpby!(α::Number, fx::Constant, β::Number, fy::Constant) =
-    truncadd!(fy, fx, α, β)
-LinearAlgebra.mul!(fy::Constant, s::Number, fx::Constant, α = true, β = false) =
-    truncmul!(fy, s, fx, α, β)
-LinearAlgebra.mul!(fy::Constant, fx::Constant, s::Number, α = true, β = false) =
-    truncmul!(fy, fx, s, α, β)
-LinearAlgebra.mul!(f::Constant, f1::Constant, f2::Constant,
-                    α = true, β = false) = truncmul!(f, f1, f2, α, β)
+LinearAlgebra.axpy!(α::Number, fx::Constant, fy::Constant) = truncadd!(fy, fx, α)
+function LinearAlgebra.axpby!(α::Number, fx::Constant, β::Number, fy::Constant)
+    return truncadd!(fy, fx, α, β)
+end
+function LinearAlgebra.mul!(fy::Constant, s::Number, fx::Constant, α=true, β=false)
+    return truncmul!(fy, s, fx, α, β)
+end
+function LinearAlgebra.mul!(fy::Constant, fx::Constant, s::Number, α=true, β=false)
+    return truncmul!(fy, fx, s, α, β)
+end
+function LinearAlgebra.mul!(f::Constant, f1::Constant, f2::Constant,
+                            α=true, β=false)
+    return truncmul!(f, f1, f2, α, β)
+end
 
-function truncadd!(fy::Constant, fx::Constant, α = true, β = true; kwargs...)
+function truncadd!(fy::Constant, fx::Constant, α=true, β=true; kwargs...)
     if eltype(fy) <: Number
-        fy[] = α*fx[] + β*fy[]
+        fy[] = α * fx[] + β * fy[]
     else
         if iszero(β)
             mul!(fy[], α, fx[])
@@ -104,22 +108,25 @@ function truncadd!(fy::Constant, fx::Constant, α = true, β = true; kwargs...)
     return fy
 end
 
-truncmul!(fdst::Constant, α₁::Number, fsrc::Constant, α₂ = true, β = false;
-            kwargs...) = truncadd!(fdst, fsrc, α₁ * α₂, β; kwargs...)
-truncmul!(fdst::Constant, fsrc::Constant, α₁::Number, α₂ = true, β = false;
-            kwargs...) = truncadd!(fdst, fsrc, α₁ * α₂, β; kwargs...)
+function truncmul!(fdst::Constant, α₁::Number, fsrc::Constant, α₂=true, β=false;
+                   kwargs...)
+    return truncadd!(fdst, fsrc, α₁ * α₂, β; kwargs...)
+end
+function truncmul!(fdst::Constant, fsrc::Constant, α₁::Number, α₂=true, β=false;
+                   kwargs...)
+    return truncadd!(fdst, fsrc, α₁ * α₂, β; kwargs...)
+end
 
 function truncmul!(f::Constant, f1::Constant, f2::Constant,
-                    α = true, β = false;
-                    Kmax::Integer = 0, tol::Real = 0)
-
+                   α=true, β=false;
+                   Kmax::Integer=0, tol::Real=0)
     if eltype(f) <: Number
         f[] = α * f1[] + β * f2[]
     else
         if eltype(f1) <: Number
-            axpby!(α*f1[], f2[], β, f[])
+            axpby!(α * f1[], f2[], β, f[])
         elseif eltype(f2) <: Number
-            axpby!(α*f2[], f1[], β, f[])
+            axpby!(α * f2[], f1[], β, f[])
         else
             mul!(f[], f1[], f2[], α, β)
         end
@@ -133,7 +140,7 @@ LinearAlgebra.norm(f::Constant) = norm(f[])
 
 # Differentiation and integration
 differentiate(f::Constant) = zero(f)
-integrate(f::Constant, (a,b)::Tuple{Real,Real}) = f[]*(b-a)
+integrate(f::Constant, (a, b)::Tuple{Real,Real}) = f[] * (b - a)
 
 # Apply linear and bilinear maps locally
 map_linear(φ, f::Constant; kwargs...) = Constant(φ(f[]))
@@ -145,8 +152,9 @@ Base.real(f::Constant) = Constant(real(f[]))
 Base.imag(f::Constant) = Constant(imag(f[]))
 
 # Fit constant: take average over N points
-fit(f, ::Type{Constant}, (a,b)::Tuple{Real,Real}; numpoints = 5) =
-    Constant(sum(f, range(a, b; length = numpoints))/numpoints)
+function fit(f, ::Type{Constant}, (a, b)::Tuple{Real,Real}; numpoints=5)
+    return Constant(sum(f, range(a, b; length=numpoints)) / numpoints)
+end
 
 # Inverse and square root
 Base.inv(f::Constant) = Constant(inv(f[]))

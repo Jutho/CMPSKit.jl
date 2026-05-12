@@ -1,5 +1,5 @@
 const PeriodicMatrixFunction = Union{Constant{<:AbstractMatrix},
-                                        FourierSeries{<:AbstractMatrix}}
+                                     FourierSeries{<:AbstractMatrix}}
 
 # Gauges:
 # :n => no particular gauge, left and right fixed points completely generic
@@ -14,7 +14,7 @@ mutable struct InfiniteCMPS{T<:PeriodicMatrixFunction,N} <: LinearCMPS{T,N}
     Q::T
     Rs::NTuple{N,T}
     gauge::Symbol
-    function InfiniteCMPS(Q::T, Rs::NTuple{N,T}; gauge::Symbol = :n) where {T,N}
+    function InfiniteCMPS(Q::T, Rs::NTuple{N,T}; gauge::Symbol=:n) where {T,N}
         for R in Rs
             domain(R) == domain(Q) || throw(DomainMismatch())
         end
@@ -26,14 +26,14 @@ mutable struct InfiniteCMPS{T<:PeriodicMatrixFunction,N} <: LinearCMPS{T,N}
         return new{T,N}(Q, Rs, gauge)
     end
 end
-InfiniteCMPS(Q::T, R::T; kwargs...) where T = InfiniteCMPS(Q, (R,); kwargs...)
+InfiniteCMPS(Q::T, R::T; kwargs...) where {T} = InfiniteCMPS(Q, (R,); kwargs...)
 
 domain(::InfiniteCMPS) = (-Inf, +Inf)
 period(Ψ::InfiniteCMPS) = period(Ψ.Q)
 
 Base.iterate(Ψ::InfiniteCMPS, args...) = iterate((Ψ.Q, Ψ.Rs), args...)
 
-Base.copy(Ψ::InfiniteCMPS) = InfiniteCMPS(copy(Ψ.Q), map(copy, Ψ.Rs); gauge = Ψ.gauge)
+Base.copy(Ψ::InfiniteCMPS) = InfiniteCMPS(copy(Ψ.Q), map(copy, Ψ.Rs); gauge=Ψ.gauge)
 
 virtualdim(Ψ::InfiniteCMPS) = size(Ψ.Q[0], 1)
 

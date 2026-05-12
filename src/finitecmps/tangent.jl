@@ -2,14 +2,15 @@
 # However, instances of FiniteCMPSTangent constitute a vector space, and we can define the # necessary methods to allow using them as such in KrylovKit.jl.
 # Furthermore, we explicitly store the base point and the indices of the original tent
 # functions, as we might actually be working on a finer grid than the optimization grid.
-mutable struct FiniteCMPSTangent{T<:MatrixFunction, N, V<:AbstractVector, I}
-    base::FiniteCMPS{T, N, V}
+mutable struct FiniteCMPSTangent{T<:MatrixFunction,N,V<:AbstractVector,I}
+    base::FiniteCMPS{T,N,V}
     dQ::T
     dRs::NTuple{N,T}
     dvL::V
     dvR::V
     indices::I
-    function FiniteCMPSTangent(Ψ::FiniteCMPS{T, N, V}, dQ::T, dRs::NTuple{N,T}, dvL::V, dvR::V, indices = 1:length(nodes(dQ))) where {T,N,V}
+    function FiniteCMPSTangent(Ψ::FiniteCMPS{T,N,V}, dQ::T, dRs::NTuple{N,T}, dvL::V,
+                               dvR::V, indices=1:length(nodes(dQ))) where {T,N,V}
         grid = nodes(Ψ.Q)
         grid == nodes(dQ) || throw(DomainMismatch())
         for dR in dRs
@@ -17,7 +18,7 @@ mutable struct FiniteCMPSTangent{T<:MatrixFunction, N, V<:AbstractVector, I}
         end
         a = first(grid)
         Qa = Ψ.Q(a)
-        length(dvL) == length(dvR) == size(Qa,1) || throw(DimensionMismatch())
+        length(dvL) == length(dvR) == size(Qa, 1) || throw(DimensionMismatch())
         size(dQ(a)) == size(Qa) || throw(DimensionMismatch())
         for dR in dRs
             size(dR(a)) == size(Qa) || throw(DimensionMismatch())
@@ -36,8 +37,8 @@ base(Φ::FiniteCMPSTangent) = Φ.base
 Base.iterate(Φ::FiniteCMPSTangent, args...) = iterate((Φ.dQ, Φ.dRs, Φ.dvL, Φ.dvR), args...)
 
 for f in (:copy, :zero, :similar)
-    @eval Base.$f(Φ::FiniteCMPSTangent) =
-        FiniteCMPSTangent(Φ.base, $f(Φ.dQ), $f.(Φ.dRs), $f(Φ.dvL), $f(Φ.dvR), Φ.indices)
+    @eval Base.$f(Φ::FiniteCMPSTangent) = FiniteCMPSTangent(Φ.base, $f(Φ.dQ), $f.(Φ.dRs),
+                                                            $f(Φ.dvL), $f(Φ.dvR), Φ.indices)
 end
 
 function Base.copy!(Φ₁::FiniteCMPSTangent, Φ₂::FiniteCMPSTangent)
@@ -51,35 +52,40 @@ function Base.copy!(Φ₁::FiniteCMPSTangent, Φ₂::FiniteCMPSTangent)
 end
 
 # Basic out-of-place arithmitic
-Base.:-(Φ::FiniteCMPSTangent) =
-    FiniteCMPSTangent(base(Φ), -Φ.dQ, .- Φ.dRs, -Φ.dvL, -Φ.dvR, Φ.indices)
-Base.:*(α, Φ::FiniteCMPSTangent) =
-        FiniteCMPSTangent(base(Φ), α * Φ.dQ, α .* Φ.dRs, α * Φ.dvL, α * Φ.dvR, Φ.indices)
-Base.:\(α, Φ::FiniteCMPSTangent) =
-        FiniteCMPSTangent(base(Φ), α \ Φ.dQ, α .\ Φ.dRs, α \ Φ.dvL, α \ Φ.dvR, Φ.indices)
-Base.:*(Φ::FiniteCMPSTangent, α) =
-        FiniteCMPSTangent(base(Φ), Φ.dQ * α, Φ.dRs .* α, Φ.dvL * α, Φ.dvR * α, Φ.indices)
-Base.:/(Φ::FiniteCMPSTangent, α) =
-        FiniteCMPSTangent(base(Φ), Φ.dQ / α, Φ.dRs ./ α, Φ.dvL / α, Φ.dvR / α, Φ.indices)
+function Base.:-(Φ::FiniteCMPSTangent)
+    return FiniteCMPSTangent(base(Φ), -Φ.dQ, .-Φ.dRs, -Φ.dvL, -Φ.dvR, Φ.indices)
+end
+function Base.:*(α, Φ::FiniteCMPSTangent)
+    return FiniteCMPSTangent(base(Φ), α * Φ.dQ, α .* Φ.dRs, α * Φ.dvL, α * Φ.dvR, Φ.indices)
+end
+function Base.:\(α, Φ::FiniteCMPSTangent)
+    return FiniteCMPSTangent(base(Φ), α \ Φ.dQ, α .\ Φ.dRs, α \ Φ.dvL, α \ Φ.dvR, Φ.indices)
+end
+function Base.:*(Φ::FiniteCMPSTangent, α)
+    return FiniteCMPSTangent(base(Φ), Φ.dQ * α, Φ.dRs .* α, Φ.dvL * α, Φ.dvR * α, Φ.indices)
+end
+function Base.:/(Φ::FiniteCMPSTangent, α)
+    return FiniteCMPSTangent(base(Φ), Φ.dQ / α, Φ.dRs ./ α, Φ.dvL / α, Φ.dvR / α, Φ.indices)
+end
 function Base.:+(Φ₁::FiniteCMPSTangent, Φ₂::FiniteCMPSTangent)
     (base(Φ₁) == base(Φ₂) && Φ₁.indices == Φ₂.indices) || throw(DomainMismatch())
 
     return FiniteCMPSTangent(base(Φ₁),
-                                Φ₁.dQ + Φ₂.dQ,
-                                Φ₁.dRs .+ Φ₂.dRs,
-                                Φ₁.dvL + Φ₂.dvL,
-                                Φ₁.dvR + Φ₂.dvR,
-                                Φ₁.indices)
+                             Φ₁.dQ + Φ₂.dQ,
+                             Φ₁.dRs .+ Φ₂.dRs,
+                             Φ₁.dvL + Φ₂.dvL,
+                             Φ₁.dvR + Φ₂.dvR,
+                             Φ₁.indices)
 end
 function Base.:-(Φ₁::FiniteCMPSTangent, Φ₂::FiniteCMPSTangent)
     (base(Φ₁) == base(Φ₂) && Φ₁.indices == Φ₂.indices) || throw(DomainMismatch())
 
     return FiniteCMPSTangent(base(Φ₁),
-                                Φ₁.dQ - Φ₂.dQ,
-                                Φ₁.dRs .- Φ₂.dRs,
-                                Φ₁.dvL - Φ₂.dvL,
-                                Φ₁.dvR - Φ₂.dvR,
-                                Φ₁.indices)
+                             Φ₁.dQ - Φ₂.dQ,
+                             Φ₁.dRs .- Φ₂.dRs,
+                             Φ₁.dvL - Φ₂.dvL,
+                             Φ₁.dvR - Φ₂.dvR,
+                             Φ₁.indices)
 end
 
 # In-place arithmitic
@@ -140,7 +146,7 @@ function LinearAlgebra.dot(Φ₁::FiniteCMPSTangent, Φ₂::FiniteCMPSTangent)
     (base(Φ₁) == base(Φ₂) && Φ₁.indices == Φ₂.indices) || throw(DomainMismatch())
 
     ind = Φ₁.indices
-    s = dot(Φ₁.dvL, Φ₂.dvL) + dot(Φ₁.dvR , Φ₂.dvR)
+    s = dot(Φ₁.dvL, Φ₂.dvL) + dot(Φ₁.dvR, Φ₂.dvR)
     s += dot(view(nodevalues(Φ₁.dQ), ind), view(nodevalues(Φ₂.dQ), ind))
     for (dR₁, dR₂) in zip(Φ₁.dRs, Φ₂.dRs)
         s += dot(view(nodevalues(dR₁), ind), view(nodevalues(dR₂), ind))
@@ -160,59 +166,59 @@ end
 # Given the functional derivatives of some object with respect to Q, R and ∂R as instances
 # of `AbstractPiecewise`, compute the corresponding `PiecewiseLinear` version resulting from
 # applying the chain rule
-function _project(𝒬̅, ℛ̅s, ∂ℛ̅s = nothing; gradindices = 1:length(nodes(𝒬̅)))
+function _project(𝒬̅, ℛ̅s, ∂ℛ̅s=nothing; gradindices=1:length(nodes(𝒬̅)))
     (a, b) = domain(𝒬̅)
     grid = collect(nodes(𝒬̅))
 
     # Compute gradients with respect to PiecewiseLinear parameters
-    Q̄ = [zero(𝒬̅(a)) for _ = 1:length(gradindices)]
-    R̄s = map(ℛ̅->[zero(ℛ̅(a)) for _ = 1:length(gradindices)], ℛ̅s)
+    Q̄ = [zero(𝒬̅(a)) for _ in 1:length(gradindices)]
+    R̄s = map(ℛ̅ -> [zero(ℛ̅(a)) for _ in 1:length(gradindices)], ℛ̅s)
 
     k = gradindices[1] # == 1
     knext = gradindices[2]
     xc = grid[k]
     xb = grid[knext]
-    t = TaylorSeries([1,-1/(xb-xc)], xc)
+    t = TaylorSeries([1, -1 / (xb - xc)], xc)
     Q̄i = Q̄[1]
-    for l = k:(knext-1)
+    for l in k:(knext - 1)
         t = shift!(t, offset(𝒬̅[l]))
-        Q̄i .+= integrate(𝒬̅[l] * t, (grid[l], grid[l+1]))
+        Q̄i .+= integrate(𝒬̅[l] * t, (grid[l], grid[l + 1]))
     end
     Q̄[1] = Q̄i
 
-    for i = 2:length(gradindices)-1
+    for i in 2:(length(gradindices) - 1)
         k = gradindices[i]
-        kprev = gradindices[i-1]
-        knext = gradindices[i+1]
+        kprev = gradindices[i - 1]
+        knext = gradindices[i + 1]
         xa = grid[kprev]
         xc = grid[k]
         xb = grid[knext]
 
         Q̄i = Q̄[i]
         R̄is = getindex.(R̄s, i)
-        t = TaylorSeries([0,1/(xc-xa)], xa)
-        for l = kprev:(k-1)
+        t = TaylorSeries([0, 1 / (xc - xa)], xa)
+        for l in kprev:(k - 1)
             t = shift!(t, offset(𝒬̅[l]))
-            Q̄i .+= integrate(𝒬̅[l] * t, (grid[l], grid[l+1]))
+            Q̄i .+= integrate(𝒬̅[l] * t, (grid[l], grid[l + 1]))
             for (R̄i, ℛ̅) in zip(R̄is, ℛ̅s)
-                R̄i .+= integrate(ℛ̅[l] * t, (grid[l], grid[l+1]))
+                R̄i .+= integrate(ℛ̅[l] * t, (grid[l], grid[l + 1]))
             end
             if !isnothing(∂ℛ̅s)
                 for (R̄i, ∂ℛ̅) in zip(R̄is, ∂ℛ̅s)
-                    R̄i .+= integrate(∂ℛ̅[l]/(xc-xa), (grid[l], grid[l+1]))
+                    R̄i .+= integrate(∂ℛ̅[l] / (xc - xa), (grid[l], grid[l + 1]))
                 end
             end
         end
-        t = TaylorSeries([1,-1/(xb-xc)], xc)
-        for l = k:(knext-1)
+        t = TaylorSeries([1, -1 / (xb - xc)], xc)
+        for l in k:(knext - 1)
             t = shift!(t, offset(𝒬̅[l]))
-            Q̄i .+= integrate(𝒬̅[l] * t, (grid[l], grid[l+1]))
+            Q̄i .+= integrate(𝒬̅[l] * t, (grid[l], grid[l + 1]))
             for (R̄i, ℛ̅) in zip(R̄is, ℛ̅s)
-                R̄i .+= integrate(ℛ̅[l] * t, (grid[l], grid[l+1]))
+                R̄i .+= integrate(ℛ̅[l] * t, (grid[l], grid[l + 1]))
             end
             if !isnothing(∂ℛ̅s)
                 for (R̄i, ∂ℛ̅) in zip(R̄is, ∂ℛ̅s)
-                    R̄i .+= integrate(∂ℛ̅[l]/(xc-xb), (grid[l], grid[l+1]))
+                    R̄i .+= integrate(∂ℛ̅[l] / (xc - xb), (grid[l], grid[l + 1]))
                 end
             end
         end
@@ -221,15 +227,15 @@ function _project(𝒬̅, ℛ̅s, ∂ℛ̅s = nothing; gradindices = 1:length(no
     end
 
     k = gradindices[end]
-    kprev = gradindices[end-1]
+    kprev = gradindices[end - 1]
     xa = grid[kprev]
     xc = grid[k]
 
     Q̄i = Q̄[end]
-    t = TaylorSeries([0,1/(xc-xa)], xa)
-    for l = kprev:(k-1)
+    t = TaylorSeries([0, 1 / (xc - xa)], xa)
+    for l in kprev:(k - 1)
         t = shift!(t, offset(𝒬̅[l]))
-        Q̄i .+= integrate(𝒬̅[l] * t, (grid[l], grid[l+1]))
+        Q̄i .+= integrate(𝒬̅[l] * t, (grid[l], grid[l + 1]))
     end
     Q̄[end] = Q̄i
 
@@ -242,7 +248,7 @@ function _project(𝒬̅, ℛ̅s, ∂ℛ̅s = nothing; gradindices = 1:length(no
         ∇Rs = PiecewiseLinear.((grid2,), R̄s)
         ∇Q = PiecewiseLinear(grid, ∇Q.(grid))
         ∇Rs = map(∇Rs) do ∇R
-            PiecewiseLinear(grid, ∇R.(grid))
+            return PiecewiseLinear(grid, ∇R.(grid))
         end
     end
 
@@ -251,10 +257,9 @@ end
 
 # Actual metric acting on a given tangent vector
 function metric(Φ::FiniteCMPSTangent, Ψρs::FiniteCMPSData;
-                δ = 0, Kmax = 50, tol = defaulttol(base(Φ)),
-                left_boundary = :free, right_boundary = :free,
-                gradindices = 1:length(nodes(Φ.dQ)))
-
+                δ=0, Kmax=50, tol=defaulttol(base(Φ)),
+                left_boundary=:free, right_boundary=:free,
+                gradindices=1:length(nodes(Φ.dQ)))
     Ψ, ρL, ρR = Ψρs
 
     base(Φ) == Ψ || throw(DomainMismatch())
@@ -272,13 +277,13 @@ function metric(Φ::FiniteCMPSTangent, Ψρs::FiniteCMPSData;
         ρRRd = mul!(temp, ρR, R')
         fR = mul!(fR, dR, ρRRd, one(T), one(T))
     end
-    FL, = lefttransfer(zero(fL(a)), fL, Ψ; Kmax = Kmax, tol = tol)
-    FR, = righttransfer(zero(fR(b)), fR, Ψ; Kmax = Kmax, tol = tol)
+    FL, = lefttransfer(zero(fL(a)), fL, Ψ; Kmax=Kmax, tol=tol)
+    FR, = righttransfer(zero(fR(b)), fR, Ψ; Kmax=Kmax, tol=tol)
 
     𝒬̅ = zero(FL)
     𝒬̅ = mul!(𝒬̅, FL, ρR, one(T), one(T))
     𝒬̅ = mul!(𝒬̅, ρL, FR, one(T), one(T))
-    ℛ̅s = map(_->zero(FL), Rs)
+    ℛ̅s = map(_ -> zero(FL), Rs)
     for (R, ℛ̅, dR) in zip(Rs, ℛ̅s, Φ.dRs)
         FLR = mul!(temp, FL, R)
         ℛ̅ = mul!(ℛ̅, FLR, ρR, one(T), one(T))
@@ -287,5 +292,5 @@ function metric(Φ::FiniteCMPSTangent, Ψρs::FiniteCMPSData;
         dRρR = mul!(temp, dR, ρR)
         ℛ̅ = mul!(ℛ̅, ρL, dRρR, one(T), one(T))
     end
-    return _project(𝒬̅, ℛ̅s; gradindices = gradindices)
+    return _project(𝒬̅, ℛ̅s; gradindices=gradindices)
 end

@@ -1,16 +1,16 @@
 function partialtrace1(A::AbstractMatrix, D1, D2)
-    size(A) == (D1*D2, D1*D2) || throw(DimensionMismatch())
-    B = A[1:D1:D1*D2, 1:D1:D1*D2]
-    for i = 2:D1
-        B .+= view(A, i:D1:D1*D2, i:D1:D1*D2)
+    size(A) == (D1 * D2, D1 * D2) || throw(DimensionMismatch())
+    B = A[1:D1:(D1 * D2), 1:D1:(D1 * D2)]
+    for i in 2:D1
+        B .+= view(A, i:D1:(D1 * D2), i:D1:(D1 * D2))
     end
     return B
 end
 function partialtrace2(A::AbstractMatrix, D1, D2)
-    size(A) == (D1*D2, D1*D2) || throw(DimensionMismatch())
+    size(A) == (D1 * D2, D1 * D2) || throw(DimensionMismatch())
     B = A[1:D1, 1:D1]
-    for i = 2:D2
-        B .+= view(A, 1+(i-1)*D1:i*D1, 1+(i-1)*D1:i*D1)
+    for i in 2:D2
+        B .+= view(A, (1 + (i - 1) * D1):(i * D1), (1 + (i - 1) * D1):(i * D1))
     end
     return B
 end

@@ -23,10 +23,9 @@ The result is given by
 and returned as `HL, converged` with `HL::Piecewise` and where `converged::Bool` is `true`
 or `false` depending on convergence up to the requested tolerance.
 """
-function lefttransfer(HL₀::AbstractMatrix, hL::Union{Nothing, AbstractPiecewise},
-                        Ψ₁::FiniteCMPS, Ψ₂::FiniteCMPS = Ψ₁;
-                        Kmax = 50, tol = defaulttol(Ψ₁))
-
+function lefttransfer(HL₀::AbstractMatrix, hL::Union{Nothing,AbstractPiecewise},
+                      Ψ₁::FiniteCMPS, Ψ₂::FiniteCMPS=Ψ₁;
+                      Kmax=50, tol=defaulttol(Ψ₁))
     Q₁ = Ψ₁.Q
     R₁s = Ψ₁.Rs
     Q₂ = Ψ₂.Q
@@ -45,11 +44,11 @@ function lefttransfer(HL₀::AbstractMatrix, hL::Union{Nothing, AbstractPiecewis
     HLs = Vector{typeof(HLᵢ)}(undef, N)
     HLs[1] = HLᵢ
     infoL = true
-    for i = 1:N
+    for i in 1:N
         HLᵢ = HLs[i]
         xᵢ = grid[i]
-        xⱼ = grid[i+1]
-        Δxᵢ = grid[i+1] - grid[i]
+        xⱼ = grid[i + 1]
+        Δxᵢ = grid[i + 1] - grid[i]
         Q₁ᵢ = shift!(Q₁[i], xᵢ)
         R₁ᵢs = shift!.(getindex.(R₁s, i), xᵢ)
         Q₂ᵢ = shift!(Q₂[i], xᵢ)
@@ -58,13 +57,13 @@ function lefttransfer(HL₀::AbstractMatrix, hL::Union{Nothing, AbstractPiecewis
 
         # build Taylor coefficients (i.e. solve triangular problem)
         HLᵢ, converged = _lefttransfer!(HLᵢ, hLᵢ, Q₁ᵢ, R₁ᵢs, Δxᵢ, Q₂ᵢ, R₂ᵢs;
-                                        Kmax = Kmax, tol = tol)
+                                        Kmax=Kmax, tol=tol)
         infoL &= converged
-        shift!(HLᵢ, (xᵢ+xⱼ)/2)
+        shift!(HLᵢ, (xᵢ + xⱼ) / 2)
 
         # initialize next ρ element
         if i < N
-            HLs[i+1] = TaylorSeries([HLᵢ(xⱼ)], xⱼ)
+            HLs[i + 1] = TaylorSeries([HLᵢ(xⱼ)], xⱼ)
         end
     end
     HL = Piecewise(grid, HLs)
@@ -96,10 +95,9 @@ The result is given by
 and returned as `HL, converged` with `HL::Piecewise` and where `converged::Bool` is `true`
 or `false` depending on convergence up to the requested tolerance.
 """
-function righttransfer(HR₀::AbstractMatrix, hR::Union{Nothing, AbstractPiecewise},
-                        Ψ₁::FiniteCMPS, Ψ₂::FiniteCMPS = Ψ₁;
-                        Kmax = 50, tol = defaulttol(Ψ₁))
-
+function righttransfer(HR₀::AbstractMatrix, hR::Union{Nothing,AbstractPiecewise},
+                       Ψ₁::FiniteCMPS, Ψ₂::FiniteCMPS=Ψ₁;
+                       Kmax=50, tol=defaulttol(Ψ₁))
     Q₁ = Ψ₁.Q
     R₁s = Ψ₁.Rs
     Q₂ = Ψ₂.Q
@@ -118,11 +116,11 @@ function righttransfer(HR₀::AbstractMatrix, hR::Union{Nothing, AbstractPiecewi
     HRs = Vector{typeof(HRᵢ)}(undef, N)
     HRs[N] = HRᵢ
     infoR = true
-    for i = N:-1:1
+    for i in N:-1:1
         HRᵢ = HRs[i]
         xᵢ = grid[i]
-        xⱼ = grid[i+1]
-        Δxᵢ = grid[i+1] - grid[i]
+        xⱼ = grid[i + 1]
+        Δxᵢ = grid[i + 1] - grid[i]
         Q₁ᵢ = shift!(Q₁[i], xⱼ)
         R₁ᵢs = shift!.(getindex.(R₁s, i), xⱼ)
         Q₂ᵢ = shift!(Q₂[i], xⱼ)
@@ -131,13 +129,13 @@ function righttransfer(HR₀::AbstractMatrix, hR::Union{Nothing, AbstractPiecewi
 
         # build Taylor coefficients (i.e. solve triangular problem)
         HRᵢ, converged = _righttransfer!(HRᵢ, hRᵢ, Q₁ᵢ, R₁ᵢs, Δxᵢ, Q₂ᵢ, R₂ᵢs;
-                                            Kmax = Kmax, tol = tol)
+                                         Kmax=Kmax, tol=tol)
         infoR &= converged
-        shift!(HRᵢ, (xᵢ+xⱼ)/2)
+        shift!(HRᵢ, (xᵢ + xⱼ) / 2)
 
         # initialize next ρ element
         if i > 1
-            HRs[i-1] = TaylorSeries([HRᵢ(xᵢ)], xᵢ)
+            HRs[i - 1] = TaylorSeries([HRᵢ(xᵢ)], xᵢ)
         end
     end
     HR = Piecewise(grid, HRs)
@@ -166,37 +164,36 @@ given tolerance.
 Note that the coefficients of `h` are destroyed in the process, if you want to preserve
 those you should take a copy beforehand.
 """
-function _lefttransfer!(ρ::TaylorSeries, h::Union{Nothing, TaylorSeries},
-                            Q₁::TaylorSeries, R₁s::Tuple{Vararg{TaylorSeries}}, Δx,
-                            Q₂::TaylorSeries = Q₁, R₂s::Tuple{Vararg{TaylorSeries}} = R₁s;
-                            Kmax = 50, tol = defaulttol(ρ))
-
+function _lefttransfer!(ρ::TaylorSeries, h::Union{Nothing,TaylorSeries},
+                        Q₁::TaylorSeries, R₁s::Tuple{Vararg{TaylorSeries}}, Δx,
+                        Q₂::TaylorSeries=Q₁, R₂s::Tuple{Vararg{TaylorSeries}}=R₁s;
+                        Kmax=50, tol=defaulttol(ρ))
     Kmin = max(degree(Q₁), degree(Q₂), maximum(degree, R₁s), maximum(degree, R₂s)) + 1
     temp = zero(ρ[0])
     T = eltype(ρ[0])
-    for k = 1:Kmax
-        ρᵏ = isnothing(h) ? zero(ρ[0]) : h[k-1]
+    for k in 1:Kmax
+        ρᵏ = isnothing(h) ? zero(ρ[0]) : h[k - 1]
         # solve triangular system:
-        for l = 0:min(k-1, degree(Q₁))
-            mul!(ρᵏ, ρ[k-1-l], Q₁[l], one(T), one(T))
+        for l in 0:min(k - 1, degree(Q₁))
+            mul!(ρᵏ, ρ[k - 1 - l], Q₁[l], one(T), one(T))
         end
-        for l = 0:min(k-1, degree(Q₂))
-            mul!(ρᵏ, Q₂[l]', ρ[k-1-l], one(T), one(T))
+        for l in 0:min(k - 1, degree(Q₂))
+            mul!(ρᵏ, Q₂[l]', ρ[k - 1 - l], one(T), one(T))
         end
         for (R₁, R₂) in zip(R₁s, R₂s)
-            for l = 0:min(k-1, degree(R₂))
-                for m = 0:min(k-1-l, degree(R₁))
-                    mul!(temp, ρ[k-1-l-m], R₁[m], one(T), zero(T))
+            for l in 0:min(k - 1, degree(R₂))
+                for m in 0:min(k - 1 - l, degree(R₁))
+                    mul!(temp, ρ[k - 1 - l - m], R₁[m], one(T), zero(T))
                     mul!(ρᵏ, R₂[l]', temp, one(T), one(T))
                 end
             end
         end
-        rmul!(ρᵏ, 1/k)
+        rmul!(ρᵏ, 1 / k)
         ρ[k] = ρᵏ
         # check for convergence
         if k > Kmin
             converged = true
-            for l = k-Kmin+1:k
+            for l in (k - Kmin + 1):k
                 if norm(ρ[l]) * (Δx^l) > tol
                     converged = false
                 end
@@ -208,7 +205,6 @@ function _lefttransfer!(ρ::TaylorSeries, h::Union{Nothing, TaylorSeries},
     end
     return ρ, false
 end
-
 
 """
     _righttransfer!(ρ::TaylorSeries, h::TaylorSeries,
@@ -233,37 +229,36 @@ Note that the coefficients of `h` are destroyed in the process, if you want to p
 those you should take a copy beforehand. Also note that all TaylorSeries are assumed to have
 the same offset.
 """
-function _righttransfer!(ρ::TaylorSeries, h::Union{Nothing, TaylorSeries},
-                            Q₁::TaylorSeries, R₁s::Tuple{Vararg{TaylorSeries}}, Δx,
-                            Q₂::TaylorSeries = Q₁, R₂s::Tuple{Vararg{TaylorSeries}} = R₁s;
-                            Kmax = 50, tol = defaulttol(ρ))
-
+function _righttransfer!(ρ::TaylorSeries, h::Union{Nothing,TaylorSeries},
+                         Q₁::TaylorSeries, R₁s::Tuple{Vararg{TaylorSeries}}, Δx,
+                         Q₂::TaylorSeries=Q₁, R₂s::Tuple{Vararg{TaylorSeries}}=R₁s;
+                         Kmax=50, tol=defaulttol(ρ))
     Kmin = max(degree(Q₁), degree(Q₂), maximum(degree, R₁s), maximum(degree, R₂s)) + 1
     temp = zero(ρ[0])
     T = eltype(ρ[0])
-    for k = 1:Kmax
-        ρᵏ = isnothing(h) ? zero(ρ[0]) : rmul!(h[k-1], -1)
+    for k in 1:Kmax
+        ρᵏ = isnothing(h) ? zero(ρ[0]) : rmul!(h[k - 1], -1)
         # solve triangular system:
-        for l = 0:min(k-1, degree(Q₁))
-            mul!(ρᵏ, Q₁[l], ρ[k-1-l], -one(T), one(T))
+        for l in 0:min(k - 1, degree(Q₁))
+            mul!(ρᵏ, Q₁[l], ρ[k - 1 - l], -one(T), one(T))
         end
-        for l = 0:min(k-1, degree(Q₂))
-            mul!(ρᵏ, ρ[k-1-l], Q₂[l]', -one(T), one(T))
+        for l in 0:min(k - 1, degree(Q₂))
+            mul!(ρᵏ, ρ[k - 1 - l], Q₂[l]', -one(T), one(T))
         end
         for (R₁, R₂) in zip(R₁s, R₂s)
-            for l = 0:min(k-1, degree(R₁))
-                for m = 0:min(k-1-l, degree(R₂))
-                    mul!(temp, ρ[k-1-l-m], R₂[m]', one(T), zero(T))
+            for l in 0:min(k - 1, degree(R₁))
+                for m in 0:min(k - 1 - l, degree(R₂))
+                    mul!(temp, ρ[k - 1 - l - m], R₂[m]', one(T), zero(T))
                     mul!(ρᵏ, R₁[l], temp, -one(T), one(T))
                 end
             end
         end
-        rmul!(ρᵏ, 1/k)
+        rmul!(ρᵏ, 1 / k)
         ρ[k] = ρᵏ
         # check for convergence
         if k > Kmin
             converged = true
-            for l = k-Kmin+1:k
+            for l in (k - Kmin + 1):k
                 if norm(ρ[l]) * (Δx^l) > tol
                     converged = false
                 end

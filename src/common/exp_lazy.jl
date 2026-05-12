@@ -1,18 +1,19 @@
 using LinearAlgebra
 import LinearAlgebra: BlasFloat
 
-exp_blocktriangular_lazy(A::AbstractMatrix) =
-    exp_blocktriangular_lazy!(copy(A))
+exp_blocktriangular_lazy(A::AbstractMatrix) = exp_blocktriangular_lazy!(copy(A))
 
-exp_blocktriangular_lazy(A::AbstractMatrix, C::AbstractMatrix) =
-    exp_blocktriangular_lazy!(copy(A), copy(C))
+function exp_blocktriangular_lazy(A::AbstractMatrix, C::AbstractMatrix)
+    return exp_blocktriangular_lazy!(copy(A), copy(C))
+end
 
 function exp_blocktriangular_lazy!(A::StridedMatrix{T}) where {T<:BlasFloat}
     XA, XC, fB = exp_blocktriangular_lazy!(A, A)
     return XA, fB
 end
 
-function exp_blocktriangular_lazy!(A::StridedMatrix{T}, C::StridedMatrix{T}) where {T<:BlasFloat}
+function exp_blocktriangular_lazy!(A::StridedMatrix{T},
+                                   C::StridedMatrix{T}) where {T<:BlasFloat}
     # Dimension checking
     n1 = LinearAlgebra.checksquare(A)
     n2 = LinearAlgebra.checksquare(C)
@@ -40,7 +41,7 @@ function exp_blocktriangular_lazy!(A::StridedMatrix{T}, C::StridedMatrix{T}) whe
             AUpV, AVmU, CUpV, CVmU, Alist, Clist = exp_blocktriangular_pade3(A, C)
         end
     else
-        s  = ceil(Int, log2(nAC/5.4)) # power of 2 later reversed by squaring
+        s = ceil(Int, log2(nAC / 5.4)) # power of 2 later reversed by squaring
         if s > 0
             factor = convert(T, 2^s)
             A ./= factor
@@ -63,7 +64,7 @@ function exp_blocktriangular_lazy!(A::StridedMatrix{T}, C::StridedMatrix{T}) whe
         # recylce memory
         XA′ = AVmU
         XC′ = CVmU
-        for t = 1:s
+        for t in 1:s
             XA′ = mul!(XA′, XA, XA)
             XA, XA′ = XA′, XA
             if AeqC
@@ -73,9 +74,9 @@ function exp_blocktriangular_lazy!(A::StridedMatrix{T}, C::StridedMatrix{T}) whe
                 XC, XC′ = XC′, XC
             end
             if t < s
-                XAlist[t+1] = copy(XA)
+                XAlist[t + 1] = copy(XA)
                 if !AeqC
-                    XClist[t+1] = copy(XC)
+                    XClist[t + 1] = copy(XC)
                 end
             end
         end
@@ -110,7 +111,7 @@ function exp_blocktriangular_lazy!(A::StridedMatrix{T}, C::StridedMatrix{T}) whe
         if s > 0
             # recylce memory
             XB′ = BVmU
-            for t = 1:s
+            for t in 1:s
                 XA = XAlist[t]
                 XC = XClist[t]
                 XB′ = mul!(mul!(XB′, XA, XB), XB, XC, true, true)
@@ -127,9 +128,11 @@ end
 # 13th order Pade approximation
 function exp_blocktriangular_pade13(A, C)
     T = eltype(A)
-    coeffs = T[64764752532480000., 32382376266240000., 7771770303897600., 1187353796428800.,
-            129060195264000., 10559470521600., 670442572800., 33522128640., 1323241920.,
-            40840800., 960960., 16380., 182., 1.]
+    coeffs = T[64764752532480000.0, 32382376266240000.0, 7771770303897600.0,
+               1187353796428800.0,
+               129060195264000.0, 10559470521600.0, 670442572800.0, 33522128640.0,
+               1323241920.0,
+               40840800.0, 960960.0, 16380.0, 182.0, 1.0]
     Alist = Vector{typeof(A)}(undef, 6)
     Clist = Vector{typeof(C)}(undef, 6)
 
@@ -203,9 +206,11 @@ end
 
 function exp_blocktriangular_pade13_lazy(B, Alist, Clist)
     T = eltype(B)
-    coeffs = T[64764752532480000., 32382376266240000., 7771770303897600., 1187353796428800.,
-            129060195264000., 10559470521600., 670442572800., 33522128640., 1323241920.,
-            40840800., 960960., 16380., 182., 1.]
+    coeffs = T[64764752532480000.0, 32382376266240000.0, 7771770303897600.0,
+               1187353796428800.0,
+               129060195264000.0, 10559470521600.0, 670442572800.0, 33522128640.0,
+               1323241920.0,
+               40840800.0, 960960.0, 16380.0, 182.0, 1.0]
 
     B0 = zero(B)
     B2 = mul!(Alist[1] * B, B, Clist[1], true, true) # A * B + B * C
@@ -233,8 +238,9 @@ end
 # 9th order Pade approximation
 function exp_blocktriangular_pade9(A, C)
     T = eltype(A)
-    coeffs = T[17643225600., 8821612800., 2075673600., 302702400., 30270240., 2162160.,
-                110880., 3960., 90., 1.]
+    coeffs = T[17643225600.0, 8821612800.0, 2075673600.0, 302702400.0, 30270240.0,
+               2162160.0,
+               110880.0, 3960.0, 90.0, 1.0]
     Alist = Vector{typeof(A)}(undef, 5)
     Clist = Vector{typeof(C)}(undef, 5)
 
@@ -302,8 +308,9 @@ end
 
 function exp_blocktriangular_pade9_lazy(B, Alist, Clist)
     T = eltype(B)
-    coeffs = T[17643225600., 8821612800., 2075673600., 302702400., 30270240., 2162160.,
-                110880., 3960., 90., 1.]
+    coeffs = T[17643225600.0, 8821612800.0, 2075673600.0, 302702400.0, 30270240.0,
+               2162160.0,
+               110880.0, 3960.0, 90.0, 1.0]
 
     B0 = zero(B)
     B2 = mul!(Alist[1] * B, B, Clist[1], true, true) # A * B + B * C
@@ -328,7 +335,7 @@ end
 # 7th order Pade approximation
 function exp_blocktriangular_pade7(A, C)
     T = eltype(A)
-    coeffs = T[17297280., 8648640., 1995840., 277200., 25200., 1512., 56., 1.]
+    coeffs = T[17297280.0, 8648640.0, 1995840.0, 277200.0, 25200.0, 1512.0, 56.0, 1.0]
     Alist = Vector{typeof(A)}(undef, 4)
     Clist = Vector{typeof(C)}(undef, 4)
 
@@ -379,7 +386,7 @@ end
 
 function exp_blocktriangular_pade7_lazy(B, Alist, Clist)
     T = eltype(B)
-    coeffs = T[17297280., 8648640., 1995840., 277200., 25200., 1512., 56., 1.]
+    coeffs = T[17297280.0, 8648640.0, 1995840.0, 277200.0, 25200.0, 1512.0, 56.0, 1.0]
 
     B0 = zero(B)
     B2 = mul!(Alist[1] * B, B, Clist[1], true, true) # A * B + B * C
@@ -400,7 +407,7 @@ end
 # 5th order Pade approximation
 function exp_blocktriangular_pade5(A, C)
     T = eltype(A)
-    coeffs = T[30240., 15120., 3360., 420., 30., 1.]
+    coeffs = T[30240.0, 15120.0, 3360.0, 420.0, 30.0, 1.0]
     Alist = Vector{typeof(A)}(undef, 3)
     Clist = Vector{typeof(C)}(undef, 3)
 
@@ -449,7 +456,7 @@ end
 
 function exp_blocktriangular_pade5_lazy(B, Alist, Clist)
     T = eltype(B)
-    coeffs = T[30240., 15120., 3360., 420., 30., 1.]
+    coeffs = T[30240.0, 15120.0, 3360.0, 420.0, 30.0, 1.0]
 
     B0 = zero(B)
     B2 = mul!(Alist[1] * B, B, Clist[1], true, true) # A * B + B * C
@@ -468,7 +475,7 @@ end
 # 3rd order Pade approximation
 function exp_blocktriangular_pade3(A, C)
     T = eltype(A)
-    coeffs = T[120., 60., 12., 1.]
+    coeffs = T[120.0, 60.0, 12.0, 1.0]
     Alist = Vector{typeof(A)}(undef, 2)
     Clist = Vector{typeof(C)}(undef, 2)
 
@@ -513,7 +520,7 @@ end
 
 function exp_blocktriangular_pade3_lazy(B, Alist, Clist)
     T = eltype(B)
-    coeffs = T[120., 60., 12., 1.]
+    coeffs = T[120.0, 60.0, 12.0, 1.0]
 
     B0 = zero(B)
     B2 = mul!(Alist[1] * B, B, Clist[1], true, true) # A * B + B * C

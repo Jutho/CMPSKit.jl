@@ -1,26 +1,29 @@
 using Printf
 
 # groundstate with CircularCMPS{<:Constant}
-groundstate(Ĥ::LocalHamiltonian, Ψ₀::UniformCircularCMPS; kwargs...) =
-    groundstate_unconstrained(Ĥ, Ψ₀; kwargs...)
+function groundstate(Ĥ::LocalHamiltonian, Ψ₀::UniformCircularCMPS; kwargs...)
+    return groundstate_unconstrained(Ĥ, Ψ₀; kwargs...)
+end
 
-groundstate(Ĥ::LocalHamiltonian, Ψ₀::UniformCircularCMPS, n₀::Number; kwargs...) =
-    groundstate_constrained(Ĥ, Ψ₀, ntuple(k->n₀, Val(length(Ψ₀.Rs))); kwargs...)
+function groundstate(Ĥ::LocalHamiltonian, Ψ₀::UniformCircularCMPS, n₀::Number; kwargs...)
+    return groundstate_constrained(Ĥ, Ψ₀, ntuple(k -> n₀, Val(length(Ψ₀.Rs))); kwargs...)
+end
 
-groundstate(Ĥ::LocalHamiltonian,
-            Ψ₀::UniformCircularCMPS{<:AbstractMatrix, N},
-            n₀s::NTuple{N, <:Number}; kwargs...) where {N} =
-    groundstate_constrained(Ĥ, Ψ₀, n₀s; kwargs...)
+function groundstate(Ĥ::LocalHamiltonian,
+                     Ψ₀::UniformCircularCMPS{<:AbstractMatrix,N},
+                     n₀s::NTuple{N,<:Number}; kwargs...) where {N}
+    return groundstate_constrained(Ĥ, Ψ₀, n₀s; kwargs...)
+end
 
 function groundstate_unconstrained(Ĥ::LocalHamiltonian, Ψ₀::UniformCircularCMPS;
-                                    gradtol = 1e-7,
-                                    verbosity = 2,
-                                    optalg = LBGFS(20; gradtol = gradtol, verbosity = verbosity - 2),
-                                    # eigalg = defaulteigalg(Ψ₀),
-                                    # linalg = defaultlinalg(Ψ₀),
-                                    finalize! = OptimKit._finalize!,
-                                    kwargs...)
-
+                                   gradtol=1e-7,
+                                   verbosity=2,
+                                   optalg=LBGFS(20; gradtol=gradtol,
+                                                verbosity=verbosity - 2),
+                                   # eigalg = defaulteigalg(Ψ₀),
+                                   # linalg = defaultlinalg(Ψ₀),
+                                   (finalize!)=OptimKit._finalize!,
+                                   kwargs...)
     δ = 1
     function retract(x, d, α)
         ΨL, ρR = x
@@ -36,7 +39,7 @@ function groundstate_unconstrained(Ĥ::LocalHamiltonian, Ψ₀::UniformCircular
         end
 
         RLs = RLs .+ α .* dRs
-        QL = QL - α * RdR - α^2/2 * dRdR
+        QL = QL - α * RdR - α^2 / 2 * dRdR
 
         ΨL = normalize!(CircularCMPS(QL, RLs, period(ΨL)))
         ρR, = rightenv(InfiniteCMPS(ΨL.Q, ΨL.Rs; gauge=:l), ρR)
@@ -47,7 +50,7 @@ function groundstate_unconstrained(Ĥ::LocalHamiltonian, Ψ₀::UniformCircular
     transport!(v, x, d, α, xnew) = v # simplest possible transport
 
     function inner(x, d1, d2)
-        return 2*real(sum(dot.(d1, d2)))
+        return 2 * real(sum(dot.(d1, d2)))
     end
 
     function precondition(x, d)
@@ -73,11 +76,11 @@ function groundstate_unconstrained(Ĥ::LocalHamiltonian, Ψ₀::UniformCircular
 
     function _finalize!(x, E, d, numiter)
         normgrad2 = inner(x, d, d)
-        δ = max(1e-12, 1e-3*normgrad2)
+        δ = max(1e-12, 1e-3 * normgrad2)
         normgrad = sqrt(normgrad2)
         verbosity > 1 &&
             @info @sprintf("CircularCMPS ground state: iter %4d: E = %.12f, ‖∇E‖ = %.4e",
-                                numiter, E, normgrad)
+                           numiter, E, normgrad)
         return finalize!(x, E, d, numiter)
     end
 
@@ -90,41 +93,38 @@ function groundstate_unconstrained(Ĥ::LocalHamiltonian, Ψ₀::UniformCircular
     verbosity > 0 &&
         @info @sprintf("CircularCMPS ground state: initialization with ℰ = %.12f", ℰ)
 
-    x, ℰ, grad, numfg, history =
-        optimize(fg, x, optalg; retract = retract,
-                                precondition = precondition,
-                                finalize! = _finalize!,
-                                inner = inner, transport! = transport!,
-                                scale! = scale!, add! = add!,
-                                isometrictransport = true)
+    x, ℰ, grad, numfg, history = optimize(fg, x, optalg; retract=retract,
+                                          precondition=precondition,
+                                          (finalize!)=_finalize!,
+                                          inner=inner, (transport!)=transport!,
+                                          (scale!)=scale!, (add!)=add!,
+                                          isometrictransport=true)
     ΨL, = x
     normgrad = sqrt(inner(x, grad, grad))
     if verbosity > 0
         if normgrad <= gradtol
             @info @sprintf("CircularCMPS ground state: converged after %d iterations: e = %.12f, ‖∇e‖ = %.4e",
-                            size(history, 1), ℰ, normgrad)
+                           size(history, 1), ℰ, normgrad)
         else
             @warn @sprintf("CircularCMPS ground state: not converged to requested tol: e = %.12f, ‖∇e‖ = %.4e",
-                            ℰ, normgrad)
+                           ℰ, normgrad)
         end
     end
     return ΨL, ℰ, normgrad, numfg, history
 end
-
 
 # EXPERIMENTAL STUFF
 #--------------------
 
 # groundstate2: no preconditioning
 function groundstate2(Ĥ::LocalHamiltonian, Ψ₀::UniformCircularCMPS;
-                                    gradtol = 1e-7,
-                                    verbosity = 2,
-                                    optalg = LBGFS(20; gradtol = gradtol, verbosity = verbosity - 2),
-                                    # eigalg = defaulteigalg(Ψ₀),
-                                    # linalg = defaultlinalg(Ψ₀),
-                                    finalize! = OptimKit._finalize!,
-                                    kwargs...)
-
+                      gradtol=1e-7,
+                      verbosity=2,
+                      optalg=LBGFS(20; gradtol=gradtol, verbosity=verbosity - 2),
+                      # eigalg = defaulteigalg(Ψ₀),
+                      # linalg = defaultlinalg(Ψ₀),
+                      (finalize!)=OptimKit._finalize!,
+                      kwargs...)
     function retract(x, d, α)
         ΨL = x
         QL = ΨL.Q
@@ -139,7 +139,7 @@ function groundstate2(Ĥ::LocalHamiltonian, Ψ₀::UniformCircularCMPS;
         end
 
         RLs = RLs .+ α .* dRs
-        QL = QL - α * RdR - α^2/2 * dRdR
+        QL = QL - α * RdR - α^2 / 2 * dRdR
 
         ΨL = normalize!(CircularCMPS(QL, RLs, period(ΨL)))
         return ΨL, d
@@ -148,7 +148,7 @@ function groundstate2(Ĥ::LocalHamiltonian, Ψ₀::UniformCircularCMPS;
     transport!(v, x, d, α, xnew) = v # simplest possible transport
 
     function inner(x, d1, d2)
-        return 2*real(sum(dot.(d1, d2)))
+        return 2 * real(sum(dot.(d1, d2)))
     end
 
     # function precondition(x, d)
@@ -177,10 +177,9 @@ function groundstate2(Ĥ::LocalHamiltonian, Ψ₀::UniformCircularCMPS;
         normgrad = sqrt(normgrad2)
         verbosity > 1 &&
             @info @sprintf("CircularCMPS ground state: iter %4d: E = %.12f, ‖∇E‖ = %.4e",
-                                numiter, E, normgrad)
+                           numiter, E, normgrad)
         return finalize!(x, E, d, numiter)
     end
-
 
     ΨL, = leftgauge(Ψ₀; kwargs...)
     ΨL = normalize!(ΨL)
@@ -191,21 +190,20 @@ function groundstate2(Ĥ::LocalHamiltonian, Ψ₀::UniformCircularCMPS;
     verbosity > 0 &&
         @info @sprintf("CircularCMPS ground state: initialization with ℰ = %.12f", ℰ)
 
-    x, ℰ, grad, numfg, history =
-        optimize(fg, x, optalg; retract = retract,
-                                finalize! = _finalize!,
-                                inner = inner, transport! = transport!,
-                                scale! = scale!, add! = add!,
-                                isometrictransport = true)
+    x, ℰ, grad, numfg, history = optimize(fg, x, optalg; retract=retract,
+                                          (finalize!)=_finalize!,
+                                          inner=inner, (transport!)=transport!,
+                                          (scale!)=scale!, (add!)=add!,
+                                          isometrictransport=true)
     ΨL = x
     normgrad = sqrt(inner(x, grad, grad))
     if verbosity > 0
         if normgrad <= gradtol
             @info @sprintf("CircularCMPS ground state: converged after %d iterations: e = %.12f, ‖∇e‖ = %.4e",
-                            size(history, 1), ℰ, normgrad)
+                           size(history, 1), ℰ, normgrad)
         else
             @warn @sprintf("CircularCMPS ground state: not converged to requested tol: e = %.12f, ‖∇e‖ = %.4e",
-                            ℰ, normgrad)
+                           ℰ, normgrad)
         end
     end
     return ΨL, ℰ, normgrad, numfg, history
@@ -213,14 +211,13 @@ end
 
 # groundstate3: preconditioning with tangent_pace_metric
 function groundstate3(Ĥ::LocalHamiltonian, Ψ₀::UniformCircularCMPS;
-                                    gradtol = 1e-7,
-                                    verbosity = 2,
-                                    optalg = LBFGS(20; gradtol = gradtol, verbosity = verbosity - 2),
-                                    # eigalg = defaulteigalg(Ψ₀),
-                                    # linalg = defaultlinalg(Ψ₀),
-                                    finalize! = OptimKit._finalize!,
-                                    kwargs...)
-
+                      gradtol=1e-7,
+                      verbosity=2,
+                      optalg=LBFGS(20; gradtol=gradtol, verbosity=verbosity - 2),
+                      # eigalg = defaulteigalg(Ψ₀),
+                      # linalg = defaultlinalg(Ψ₀),
+                      (finalize!)=OptimKit._finalize!,
+                      kwargs...)
     δ = 1
     function retract(x, d, α)
         ΨL = x
@@ -236,7 +233,7 @@ function groundstate3(Ĥ::LocalHamiltonian, Ψ₀::UniformCircularCMPS;
         end
 
         RLs = RLs .+ α .* dRs
-        QL = QL - α * RdR - α^2/2 * dRdR
+        QL = QL - α * RdR - α^2 / 2 * dRdR
 
         ΨL = normalize!(CircularCMPS(QL, RLs, period(ΨL)))
         x = ΨL
@@ -246,7 +243,7 @@ function groundstate3(Ĥ::LocalHamiltonian, Ψ₀::UniformCircularCMPS;
     transport!(v, x, d, α, xnew) = v # simplest possible transport
 
     function inner(x, d1, d2)
-        return 2*real(sum(dot.(d1, d2)))
+        return 2 * real(sum(dot.(d1, d2)))
     end
 
     function precondition(x, d)
@@ -258,7 +255,8 @@ function groundstate3(Ĥ::LocalHamiltonian, Ψ₀::UniformCircularCMPS;
         v₀ = KrylovKit.RecursiveVec(zero.(dRs))
         # zero initialisation is important to make CG iterates descent directions
         η = min(0.1, sqrt(norm(rhs)))
-        pdRs, info = linsolve(rhs, v₀, KrylovKit.CG(; maxiter = 500, tol = η*norm(rhs), verbosity = 0)) do v
+        pdRs, info = linsolve(rhs, v₀,
+                              KrylovKit.CG(; maxiter=500, tol=η * norm(rhs), verbosity=0)) do v
             Ws = (v...,)
             V = -sum(adjoint.(Rs) .* Ws)
             GV, GWs = metric(V, Ws)
@@ -266,7 +264,7 @@ function groundstate3(Ĥ::LocalHamiltonian, Ψ₀::UniformCircularCMPS;
             GWs = axpy!.(δ, Ws, GWs)
             return KrylovKit.RecursiveVec(GWs)
         end
-        @show real(dot(pdRs, rhs)/norm(pdRs)/norm(rhs))
+        @show real(dot(pdRs, rhs) / norm(pdRs) / norm(rhs))
         if info.converged == 0
             @warn "Not converged"
         end
@@ -290,11 +288,11 @@ function groundstate3(Ĥ::LocalHamiltonian, Ψ₀::UniformCircularCMPS;
 
     function _finalize!(x, E, d, numiter)
         normgrad2 = inner(x, d, d)
-        δ = max(1e-12, 1e-3*normgrad2)
+        δ = max(1e-12, 1e-3 * normgrad2)
         normgrad = sqrt(normgrad2)
         verbosity > 1 &&
             @info @sprintf("CircularCMPS ground state: iter %4d: E = %.12f, ‖∇E‖ = %.4e",
-                                numiter, E, normgrad)
+                           numiter, E, normgrad)
         return finalize!(x, E, d, numiter)
     end
 
@@ -306,22 +304,21 @@ function groundstate3(Ĥ::LocalHamiltonian, Ψ₀::UniformCircularCMPS;
     verbosity > 0 &&
         @info @sprintf("CircularCMPS ground state: initialization with ℰ = %.12f", ℰ)
 
-    x, ℰ, grad, numfg, history =
-        optimize(fg, x, optalg; retract = retract,
-                                precondition = precondition,
-                                finalize! = _finalize!,
-                                inner = inner, transport! = transport!,
-                                scale! = scale!, add! = add!,
-                                isometrictransport = true)
+    x, ℰ, grad, numfg, history = optimize(fg, x, optalg; retract=retract,
+                                          precondition=precondition,
+                                          (finalize!)=_finalize!,
+                                          inner=inner, (transport!)=transport!,
+                                          (scale!)=scale!, (add!)=add!,
+                                          isometrictransport=true)
     ΨL = x
     normgrad = sqrt(inner(x, grad, grad))
     if verbosity > 0
         if normgrad <= gradtol
             @info @sprintf("CircularCMPS ground state: converged after %d iterations: e = %.12f, ‖∇e‖ = %.4e",
-                            size(history, 1), ℰ, normgrad)
+                           size(history, 1), ℰ, normgrad)
         else
             @warn @sprintf("CircularCMPS ground state: not converged to requested tol: e = %.12f, ‖∇e‖ = %.4e",
-                            ℰ, normgrad)
+                           ℰ, normgrad)
         end
     end
     return ΨL, ℰ, normgrad, numfg, history

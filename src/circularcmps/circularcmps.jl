@@ -1,4 +1,4 @@
-mutable struct CircularCMPS{T<:PeriodicMatrixFunction, N, S} <: AbstractCMPS{T,N}
+mutable struct CircularCMPS{T<:PeriodicMatrixFunction,N,S} <: AbstractCMPS{T,N}
     Q::T
     Rs::NTuple{N,T}
     P::S
@@ -14,13 +14,14 @@ mutable struct CircularCMPS{T<:PeriodicMatrixFunction, N, S} <: AbstractCMPS{T,N
         return new{T,N,S}(Q, Rs, P)
     end
 end
-CircularCMPS(Q::T, R::T, P = 1) where {T<:Constant} = CircularCMPS(Q, (R,), P)
-CircularCMPS(Q::T, Rs::NTuple{N,T}) where {N, T<:Constant} = CircularCMPS(Q, Rs, 1)
+CircularCMPS(Q::T, R::T, P=1) where {T<:Constant} = CircularCMPS(Q, (R,), P)
+CircularCMPS(Q::T, Rs::NTuple{N,T}) where {N,T<:Constant} = CircularCMPS(Q, Rs, 1)
 CircularCMPS(Q::T, R::T) where {T<:FourierSeries} = CircularCMPS(Q, (R,), period(Q))
-CircularCMPS(Q::T, Rs::NTuple{N,T}) where {N, T<:FourierSeries} =
-    CircularCMPS(Q, Rs, period(Q))
+function CircularCMPS(Q::T, Rs::NTuple{N,T}) where {N,T<:FourierSeries}
+    return CircularCMPS(Q, Rs, period(Q))
+end
 
-const UniformCircularCMPS{A, N} = CircularCMPS{Constant{A}, N}
+const UniformCircularCMPS{A,N} = CircularCMPS{Constant{A},N}
 
 domain(Ψ::CircularCMPS) = (zero(period(Ψ)), period(Ψ))
 period(Ψ::CircularCMPS) = Ψ.P
@@ -29,8 +30,7 @@ Base.iterate(Ψ::CircularCMPS, args...) = iterate((Ψ.Q, Ψ.Rs), args...)
 
 Base.copy(Ψ::CircularCMPS) = CircularCMPS(copy(Ψ.Q), copy.(Ψ.Rs), period(Ψ))
 
-Base.:(==)(Ψ1::CircularCMPS, Ψ2::CircularCMPS) =
-    Ψ1.Q == Ψ2.Q && Ψ1.Rs == Ψ2.Rs
+Base.:(==)(Ψ1::CircularCMPS, Ψ2::CircularCMPS) = Ψ1.Q == Ψ2.Q && Ψ1.Rs == Ψ2.Rs
 
 function LinearAlgebra.norm(Ψ::CircularCMPS; kwargs...)
     E = environment(Ψ; kwargs...)
@@ -45,11 +45,11 @@ function LinearAlgebra.dot(Ψ₁::CircularCMPS, Ψ₂::CircularCMPS; kwargs...)
 end
 
 function LinearAlgebra.normalize!(Ψ::CircularCMPS; kwargs...)
-    Ψ.Q = axpy!(-log(norm(Ψ))/period(Ψ), one(Ψ.Q), Ψ.Q)
+    Ψ.Q = axpy!(-log(norm(Ψ)) / period(Ψ), one(Ψ.Q), Ψ.Q)
     return Ψ
 end
 
-function expval(ops::LocalOperator, Ψ::CircularCMPS, E = nothing; kwargs...)
+function expval(ops::LocalOperator, Ψ::CircularCMPS, E=nothing; kwargs...)
     if isnothing(E)
         E = environment(Ψ; kwargs...)
     end
@@ -58,5 +58,5 @@ function expval(ops::LocalOperator, Ψ::CircularCMPS, E = nothing; kwargs...)
         addkronecker!(EO[], getindex.(_ketbrafactors(op, Ψ.Q, Ψ.Rs))..., c)
     end
     Z = tr(E(0))
-    return tr(EO * E)/Z
+    return tr(EO * E) / Z
 end

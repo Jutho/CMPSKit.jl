@@ -1,16 +1,20 @@
 using LinearAlgebra
 import LinearAlgebra: BlasFloat
 
-exp_blocktriangular(A::AbstractMatrix, B::AbstractMatrix) =
-    exp_blocktriangular!(copy(A), copy(B))
+function exp_blocktriangular(A::AbstractMatrix, B::AbstractMatrix)
+    return exp_blocktriangular!(copy(A), copy(B))
+end
 
-exp_blocktriangular(A::AbstractMatrix, B::AbstractMatrix, C::AbstractMatrix) =
-    exp_blocktriangular!(copy(A), copy(B), copy(C))
+function exp_blocktriangular(A::AbstractMatrix, B::AbstractMatrix, C::AbstractMatrix)
+    return exp_blocktriangular!(copy(A), copy(B), copy(C))
+end
 
-exp_blocktriangular!(A::StridedMatrix{T}, B::StridedMatrix{T}) where {T<:BlasFloat} =
-    exp_blocktriangular!(A, B, A)[1:2]
+function exp_blocktriangular!(A::StridedMatrix{T}, B::StridedMatrix{T}) where {T<:BlasFloat}
+    return exp_blocktriangular!(A, B, A)[1:2]
+end
 
-function exp_blocktriangular!(A::StridedMatrix{T}, B::StridedMatrix{T}, C::StridedMatrix{T}) where {T<:BlasFloat}
+function exp_blocktriangular!(A::StridedMatrix{T}, B::StridedMatrix{T},
+                              C::StridedMatrix{T}) where {T<:BlasFloat}
     # Dimension checking
     n1 = LinearAlgebra.checksquare(A)
     n2 = LinearAlgebra.checksquare(C)
@@ -41,7 +45,7 @@ function exp_blocktriangular!(A::StridedMatrix{T}, B::StridedMatrix{T}, C::Strid
             AUpV, AVmU, BUpV, BVmU, CUpV, CVmU = exp_blocktriangular_pade3(A, B, C)
         end
     else
-        s  = ceil(Int, log2(nAC/5.4)) # power of 2 later reversed by squaring
+        s = ceil(Int, log2(nAC / 5.4)) # power of 2 later reversed by squaring
         if s > 0
             factor = convert(T, 2^s)
             A ./= factor
@@ -51,28 +55,31 @@ function exp_blocktriangular!(A::StridedMatrix{T}, B::StridedMatrix{T}, C::Strid
             end
         end
         AUpV, AVmU, BUpV, BVmU, CUpV, CVmU = exp_blocktriangular_pade13(A, B, C)
-     end
-     AF = lu!(AVmU)
-     XA = ldiv!(AF, AUpV)
-     XC = AeqC ? XA : ldiv!(lu!(CVmU), CUpV)
-     XB = ldiv!(AF, mul!(BUpV, BVmU, XC, -1, 1))
+    end
 
-     if s > 0
-         # recylce memory
-         XA′ = AVmU; XB′ = BVmU; XC′ = CVmU;
-         for t = 1:s
-             XA′ = mul!(XA′, XA, XA)
-             XB′ = mul!(mul!(XB′, XA, XB), XB, XC, true, true)
-             XA, XA′ = XA′, XA
-             XB, XB′ = XB′, XB
-             if AeqC
-                 XC = XA
-             else
-                 XC′ = mul!(XC′, XC, XC)
-                 XC, XC′ = XC′, XC
-             end
-         end
-     end
+    AF = lu!(AVmU)
+    XA = ldiv!(AF, AUpV)
+    XC = AeqC ? XA : ldiv!(lu!(CVmU), CUpV)
+    XB = ldiv!(AF, mul!(BUpV, BVmU, XC, -1, 1))
+
+    if s > 0
+        # recylce memory
+        XA′ = AVmU
+        XB′ = BVmU
+        XC′ = CVmU
+        for t in 1:s
+            XA′ = mul!(XA′, XA, XA)
+            XB′ = mul!(mul!(XB′, XA, XB), XB, XC, true, true)
+            XA, XA′ = XA′, XA
+            XB, XB′ = XB′, XB
+            if AeqC
+                XC = XA
+            else
+                XC′ = mul!(XC′, XC, XC)
+                XC, XC′ = XC′, XC
+            end
+        end
+    end
 
     # Undo the balancing
     XA = _unbalance!(XA, ilo1, ihi1, scale1) # modifies XA
@@ -83,9 +90,11 @@ end
 
 function exp_blocktriangular_pade13(A, B, C)
     T = eltype(A)
-    coeffs = T[64764752532480000., 32382376266240000., 7771770303897600., 1187353796428800.,
-            129060195264000., 10559470521600., 670442572800., 33522128640., 1323241920.,
-            40840800., 960960., 16380., 182., 1.]
+    coeffs = T[64764752532480000.0, 32382376266240000.0, 7771770303897600.0,
+               1187353796428800.0,
+               129060195264000.0, 10559470521600.0, 670442572800.0, 33522128640.0,
+               1323241920.0,
+               40840800.0, 960960.0, 16380.0, 182.0, 1.0]
 
     AeqC = A === C
     A0 = one(A)
@@ -117,7 +126,12 @@ function exp_blocktriangular_pade13(A, B, C)
     BV = coeffs[7] .* B6 .+ coeffs[5] .* B4 .+ coeffs[3] .* B2 .+ coeffs[1] .* B0
     BV = mul!(mul!(BV, A6, BV′, true, true), B6, CV′, true, true)
 
-    AW = A0; BW = B0; CW = C0; AW′ = AV′; BW′ = BV′; CW′ = CV′;
+    AW = A0
+    BW = B0
+    CW = C0
+    AW′ = AV′
+    BW′ = BV′
+    CW′ = CV′
 
     AW′ .= coeffs[14] .* A6 .+ coeffs[12] .* A4 .+ coeffs[10] .* A2
     AW .= coeffs[8] .* A6 .+ coeffs[6] .* A4 .+ coeffs[4] .* A2 .+ coeffs[2] .* A0
@@ -154,8 +168,9 @@ end
 
 function exp_blocktriangular_pade9(A, B, C)
     T = eltype(A)
-    coeffs = T[17643225600., 8821612800., 2075673600., 302702400., 30270240., 2162160.,
-                110880., 3960., 90., 1.]
+    coeffs = T[17643225600.0, 8821612800.0, 2075673600.0, 302702400.0, 30270240.0,
+               2162160.0,
+               110880.0, 3960.0, 90.0, 1.0]
 
     AeqC = A === C
     A0 = one(A)
@@ -179,7 +194,9 @@ function exp_blocktriangular_pade9(A, B, C)
         CV = coeffs[7] .* C6 .+ coeffs[5] .* C4 .+ coeffs[3] .* C2 .+ coeffs[1] .* C0
     end
 
-    AW = A0; BW = B0; CW = C0;
+    AW = A0
+    BW = B0
+    CW = C0
     AW .= coeffs[8] .* A6 .+ coeffs[6] .* A4 .+ coeffs[4] .* A2 .+ coeffs[2] .* A0
     BW .= coeffs[8] .* B6 .+ coeffs[6] .* B4 .+ coeffs[4] .* B2 .+ coeffs[2] .* B0
     if !AeqC
@@ -220,7 +237,7 @@ end
 
 function exp_blocktriangular_pade7(A, B, C)
     T = eltype(A)
-    coeffs = T[17297280., 8648640., 1995840., 277200., 25200., 1512., 56., 1.]
+    coeffs = T[17297280.0, 8648640.0, 1995840.0, 277200.0, 25200.0, 1512.0, 56.0, 1.0]
 
     AeqC = A === C
     A0 = one(A)
@@ -244,7 +261,9 @@ function exp_blocktriangular_pade7(A, B, C)
         CV = coeffs[7] .* C6 .+ coeffs[5] .* C4 .+ coeffs[3] .* C2 .+ coeffs[1] .* C0
     end
 
-    AW = A0; BW = B0; CW = C0;
+    AW = A0
+    BW = B0
+    CW = C0
     AW .= coeffs[8] .* A6 .+ coeffs[6] .* A4 .+ coeffs[4] .* A2 .+ coeffs[2] .* A0
     BW .= coeffs[8] .* B6 .+ coeffs[6] .* B4 .+ coeffs[4] .* B2 .+ coeffs[2] .* B0
     if !AeqC
@@ -269,7 +288,7 @@ end
 
 function exp_blocktriangular_pade5(A, B, C)
     T = eltype(A)
-    coeffs = T[30240., 15120., 3360., 420., 30., 1.]
+    coeffs = T[30240.0, 15120.0, 3360.0, 420.0, 30.0, 1.0]
 
     AeqC = A === C
     A0 = one(A)
@@ -290,7 +309,9 @@ function exp_blocktriangular_pade5(A, B, C)
         CV = coeffs[5] .* C4 .+ coeffs[3] .* C2 .+ coeffs[1] .* C0
     end
 
-    AW = A0; BW = B0; CW = C0;
+    AW = A0
+    BW = B0
+    CW = C0
     AW .= coeffs[6] .* A4 .+ coeffs[4] .* A2 .+ coeffs[2] .* A0
     BW .= coeffs[6] .* B4 .+ coeffs[4] .* B2 .+ coeffs[2] .* B0
     if !AeqC
@@ -315,7 +336,7 @@ end
 
 function exp_blocktriangular_pade3(A, B, C)
     T = eltype(A)
-    coeffs = T[120., 60., 12., 1.]
+    coeffs = T[120.0, 60.0, 12.0, 1.0]
 
     AeqC = A === C
     A0 = one(A)
@@ -333,7 +354,9 @@ function exp_blocktriangular_pade3(A, B, C)
         CV = coeffs[3] .* C2 .+ coeffs[1] .* C0
     end
 
-    AW = A0; BW = B0; CW = C0;
+    AW = A0
+    BW = B0
+    CW = C0
     AW .= coeffs[4] .* A2 .+ coeffs[2] .* A0
     BW .= coeffs[4] .* B2 .+ coeffs[2] .* B0
     if !AeqC
@@ -358,23 +381,23 @@ end
 
 ## Swap rows i and j and columns i and j in X
 function _rcswap!(X::StridedMatrix, i::Integer, j::Integer)
-    for k = 1:size(X,1)
-        X[k,i], X[k,j] = X[k,j], X[k,i]
+    for k in axes(X, 1)
+        X[k, i], X[k, j] = X[k, j], X[k, i]
     end
-    for k = 1:size(X,2)
-        X[i,k], X[j,k] = X[j,k], X[i,k]
+    for k in axes(X, 2)
+        X[i, k], X[j, k] = X[j, k], X[i, k]
     end
     return X
 end
 function _rswap!(X::StridedMatrix, i::Integer, j::Integer)
-    for k = 1:size(X,2)
-        X[i,k], X[j,k] = X[j,k], X[i,k]
+    for k in axes(X, 2)
+        X[i, k], X[j, k] = X[j, k], X[i, k]
     end
     return X
 end
 function _cswap!(X::StridedMatrix, i::Integer, j::Integer)
-    for k = 1:size(X,1)
-        X[k,i], X[k,j] = X[k,j], X[k,i]
+    for k in axes(X, 1)
+        X[k, i], X[k, j] = X[k, j], X[k, i]
     end
     return X
 end
