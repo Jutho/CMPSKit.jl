@@ -1,3 +1,5 @@
+import VectorInterface
+
 # Type definition
 struct Constant{T} <: FunctionSeries{T}
     coeffs::Base.RefValue{T}
@@ -159,3 +161,24 @@ end
 # Inverse and square root
 Base.inv(f::Constant) = Constant(inv(f[]))
 Base.sqrt(f::Constant) = Constant(sqrt(f[]))
+
+VectorInterface.scalartype(::Type{Constant{T}}) where {T} = VectorInterface.scalartype(T)
+VectorInterface.scalartype(c::Constant{T}) where {T} = VectorInterface.scalartype(T)
+
+VectorInterface.zerovector(f::Constant) = Constant(VectorInterface.zerovector(f[]))
+VectorInterface.zerovector!(f::Constant) = Constant(VectorInterface.zerovector!(f[]))
+VectorInterface.zerovector!!(f::Constant) = Constant(VectorInterface.zerovector!!(f[]))
+VectorInterface.zerovector(f::Constant,::Type{S}) where {S<:Number} = Constant(VectorInterface.zerovector(f[],S))
+VectorInterface.zerovector!!(f::Constant,::Type{S}) where {S<:Number} = Constant(VectorInterface.zerovector!!(f[],S))
+
+VectorInterface.scale(v::Constant, α::Number) = Constant(VectorInterface.scale(v[], α))
+VectorInterface.scale!(v::Constant, α::Number) = Constant(VectorInterface.scale!(v[], α))
+VectorInterface.scale!!(v::Constant, α::Number) = Constant(VectorInterface.scale!!(v[], α))
+VectorInterface.scale!(w::Constant,v::Constant, α::Number) = Constant(VectorInterface.scale!(w[],v[], α))
+VectorInterface.scale!!(w::Constant, v::Constant, α::Number) = Constant(VectorInterface.scale!!(w[],v[], α))
+
+VectorInterface.add(w::Constant, v::Constant, α::Number=1, β::Number=1) = Constant(VectorInterface.add(w[], v[], α, β))
+VectorInterface.add!(w::Constant, v::Constant, α::Number=1, β::Number=1) = Constant(VectorInterface.add!(w[], v[], α, β))
+VectorInterface.add!!(w::Constant, v::Constant, α::Number=1, β::Number=1) = Constant(VectorInterface.add!!(w[], v[], α, β))
+
+VectorInterface.inner(v::Constant, w::Constant) = VectorInterface.inner(v[], w[])
